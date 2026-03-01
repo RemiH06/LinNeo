@@ -1,0 +1,30 @@
+# Archivos de secretos y configuración sensible
+.secrets
+steps.md
+*.log
+
+# Datos descargados
+biodiversity_data/
+neo4j_import
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
