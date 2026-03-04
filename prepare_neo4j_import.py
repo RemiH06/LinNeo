@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Script para preparar archivos CSV para neo4j-admin import
 Convierte los CSVs de GBIF al formato requerido por neo4j-admin
@@ -72,19 +73,23 @@ def prepare_nodes_for_import(data_dir: str = "biodiversity_data", output_dir: st
     # 2. Procesar geografía
     logger.info("Procesando nodos geográficos...")
     
-    # Continentes
+    # Continentes CON PREFIJO
     geo_file = data_path / "geographic_hierarchy.csv"
     geo_df = pd.read_csv(geo_file)
     
     continents = geo_df[['continent']].drop_duplicates().copy()
     continents.columns = ['name']
-    continents['continentId:ID'] = continents['name'].str.replace(' ', '_')
+    # AGREGAR PREFIJO continent:
+    continents['continentId:ID'] = 'continent:' + continents['name'].str.replace(' ', '_')
     continents = continents[['continentId:ID', 'name']]
     continents.to_csv(output_path / "nodes_continent.csv", index=False)
     logger.info(f"  Continent: {len(continents)} nodos -> nodes_continent.csv")
     
-    # Países
+    # Países CON PREFIJO
     countries = geo_df[['country_code', 'country_name']].copy()
+    # AGREGAR PREFIJO country:
+    countries['countryId:ID'] = 'country:' + countries['country_code']
+    countries = countries[['countryId:ID', 'country_name']]
     countries.columns = ['countryId:ID', 'name']
     countries.to_csv(output_path / "nodes_country.csv", index=False)
     logger.info(f"  Country: {len(countries)} nodos -> nodes_country.csv")
@@ -128,14 +133,43 @@ def prepare_relationships_for_import(data_dir: str = "biodiversity_data", output
     geo_file = data_path / "geographic_hierarchy.csv"
     geo_df = pd.read_csv(geo_file)
     
-    # PART_OF (Country -> Continent)
+    # PART_OF (Country -> Continent) CON PREFIJOS
     part_of = geo_df[['country_code', 'continent']].copy()
-    part_of['continent'] = part_of['continent'].str.replace(' ', '_')
-    part_of.columns = [':START_ID', ':END_ID']
+    # AGREGAR PREFIJOS a ambos lados
+    part_of[':START_ID'] = 'country:' + part_of['country_code']
+    part_of[':END_ID'] = 'continent:' + part_of['continent'].str.replace(' ', '_')
     part_of[':TYPE'] = 'PART_OF'
+    part_of = part_of[[':START_ID', ':END_ID', ':TYPE']]
     part_of.to_csv(output_path / "rels_part_of.csv", index=False)
     logger.info(f"  PART_OF: {len(part_of):,} relaciones")
     
+    # FOUND_IN (Species -> Country) CON PREFIJOS
+    logger.info("Procesando relaciones especie-geografía...")
+    species_geo_file = data_path / "species_geographic_relationships.csv"
+    
+    if species_geo_file.exists():
+        species_geo_df = pd.read_csv(species_geo_file)
+        
+        # Crear relaciones FOUND_IN
+        found_in = species_geo_df[['species_key', 'country_code']].copy()
+        found_in = found_in.dropna()
+        
+        # AGREGAR PREFIJOS a ambos lados
+        found_in[':START_ID'] = 'species:' + found_in['species_key'].astype(str)
+        found_in[':END_ID'] = 'country:' + found_in['country_code']
+        found_in[':TYPE'] = 'FOUND_IN'
+        
+        # Solo columnas necesarias
+        found_in = found_in[[':START_ID', ':END_ID', ':TYPE']]
+        found_in = found_in.drop_duplicates()
+        
+        found_in.to_csv(output_path / "rels_found_in.csv", index=False)
+        logger.info(f"  FOUND_IN: {len(found_in):,} relaciones")
+    else:
+        logger.warning(f"  No se encontró {species_geo_file}")
+        logger.warning("  Las relaciones FOUND_IN no se crearán")
+        logger.warning("  Ejecuta primero: python extract_distributions.py")
+
     logger.info("Relaciones preparadas")
 
 
@@ -185,6 +219,9 @@ def generate_import_command(output_dir: str = "neo4j_import"):
     cmd_parts.append("  --relationships=neo4j_import/rels_has_child.csv")
     cmd_parts.append("  --relationships=neo4j_import/rels_belongs_to.csv")
     cmd_parts.append("  --relationships=neo4j_import/rels_part_of.csv")
+    
+    if (output_path / "rels_found_in.csv").exists():
+        cmd_parts.append("  --relationships=neo4j_import/rels_found_in.csv")
     
     # Opciones adicionales
     cmd_parts.append("  --overwrite-destination")
