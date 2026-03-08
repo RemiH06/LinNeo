@@ -13,7 +13,7 @@
 ```
 
 ![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg?style=for-the-badge)
-![MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
+![MIT](https://img.shields.io/badge/License-GNU-blue.svg?style=for-the-badge)
 ![Neo4j](https://img.shields.io/badge/Neo4j-5.x-008CC1?style=for-the-badge&logo=neo4j)
 ![GBIF](https://img.shields.io/badge/Data-GBIF-4CAF50?style=for-the-badge)
 
