@@ -6,6 +6,7 @@ steps.md
 # Datos descargados
 biodiversity_data/
 neo4j_import
+cypher_import*
 
 # Python
 __pycache__/
