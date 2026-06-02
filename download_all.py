@@ -17,6 +17,7 @@ Uso:
 
 import argparse
 import sys
+import io
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -28,13 +29,21 @@ FETCHERS_DIR = Path("data_fetchers")
 LOG_DIR = Path("biodiversity_data/.logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Logging
+# Logging (con encoding UTF-8 para Windows)
+import sys
+import io
+
+# Fix para Windows: usar UTF-8 en consola
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(LOG_DIR / "download_all.log"),
-        logging.StreamHandler()
+        logging.FileHandler(LOG_DIR / "download_all.log", encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
@@ -49,7 +58,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_wikidata_common_names",
         "output": "biodiversity_data/wikidata/wikidata_common_names.csv",
         "time_estimate": "2-4 horas",
-        "priority": "🔴 CRÍTICA"
+        "priority": "CRÍTICA"
     },
     "eol": {
         "name": "EOL - Descripciones",
@@ -58,7 +67,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_eol_descriptions",
         "output": "biodiversity_data/eol/eol_descriptions.csv",
         "time_estimate": "3-5 horas",
-        "priority": "🔴 CRÍTICA"
+        "priority": "CRÍTICA"
     },
     "fishbase": {
         "name": "FishBase - Peces",
@@ -67,7 +76,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_fishbase_data",
         "output": "biodiversity_data/fishbase/fishbase_data.csv",
         "time_estimate": "2-3 horas",
-        "priority": "🟠 IMPORTANTE"
+        "priority": "IMPORTANTE"
     },
     "powo": {
         "name": "POWO - Plantas",
@@ -76,7 +85,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_powo_data",
         "output": "biodiversity_data/powo/powo_descriptions.csv",
         "time_estimate": "2-3 horas",
-        "priority": "🟠 IMPORTANTE"
+        "priority": "IMPORTANTE"
     },
     "amphibiaweb": {
         "name": "AmphibiaWeb - Anfibios",
@@ -85,7 +94,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_amphibiaweb_data",
         "output": "biodiversity_data/amphibiaweb/amphibiaweb_data.csv",
         "time_estimate": "1-2 horas",
-        "priority": "🟢 DESEABLE"
+        "priority": "DESEABLE"
     },
     "xeno_canto": {
         "name": "Xeno-canto - Sonidos",
@@ -94,7 +103,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_xeno_canto_urls",
         "output": "biodiversity_data/xeno_canto/xeno_canto_sounds.csv",
         "time_estimate": "2-3 horas",
-        "priority": "🔵 DESEABLE"
+        "priority": "NICE-TO-HAVE"
     },
     "inaturalist": {
         "name": "iNaturalist - Imágenes",
@@ -103,7 +112,7 @@ AVAILABLE_FETCHERS = {
         "function": "fetch_inaturalist_images",
         "output": "biodiversity_data/inaturalist/inaturalist_images.csv",
         "time_estimate": "2-3 horas",
-        "priority": "🔵 DESEABLE"
+        "priority": "NICE-TO-HAVE"
     }
 }
 
