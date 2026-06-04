@@ -60,14 +60,23 @@ AVAILABLE_FETCHERS = {
         "time_estimate": "2-4 horas",
         "priority": "CRÍTICA"
     },
+    "wikipedia": {
+        "name": "Wikipedia - Descripciones",
+        "description": "Descarga descripciones de texto completo",
+        "module": "wikipedia_fetcher",
+        "function": "fetch_wikipedia_descriptions",
+        "output": "biodiversity_data/descriptions/wikipedia_descriptions.csv",
+        "time_estimate": "varias horas",
+        "priority": "CRÍTICA"
+    },
     "eol": {
-        "name": "EOL - Descripciones",
-        "description": "Descarga descripciones textuales de especies",
+        "name": "EOL - Descripciones (respaldo)",
+        "description": "Descripciones de especies sin articulo en Wikipedia",
         "module": "eol_fetcher",
         "function": "fetch_eol_descriptions",
-        "output": "biodiversity_data/eol/eol_descriptions.csv",
+        "output": "biodiversity_data/descriptions/eol_descriptions.csv",
         "time_estimate": "3-5 horas",
-        "priority": "CRÍTICA"
+        "priority": "IMPORTANTE"
     },
     "fishbase": {
         "name": "FishBase - Peces",
@@ -119,7 +128,8 @@ AVAILABLE_FETCHERS = {
 # Orden de ejecución (dependencias)
 EXECUTION_ORDER = [
     "wikidata",      # Primero nombres comunes
-    "eol",           # Luego descripciones
+    "wikipedia",     # Descripciones (principal)
+    "eol",           # Descripciones (respaldo)
     "fishbase",      # Luego especializados
     "powo",
     "amphibiaweb",
@@ -287,6 +297,12 @@ Ejemplos:
     )
     
     parser.add_argument(
+        "--wikipedia",
+        action="store_true",
+        help="Ejecuta solo Wikipedia"
+    )
+    
+    parser.add_argument(
         "--eol",
         action="store_true",
         help="Ejecuta solo EOL"
@@ -325,7 +341,7 @@ Ejemplos:
     args = parser.parse_args()
     
     # Si no hay argumentos
-    if not any([args.all, args.list, args.wikidata, args.eol, args.fishbase, 
+    if not any([args.all, args.list, args.wikidata, args.wikipedia, args.eol, args.fishbase, 
                 args.powo, args.amphibiaweb, args.xeno_canto, args.inaturalist]):
         parser.print_help()
         return
@@ -344,6 +360,8 @@ Ejemplos:
         
         if args.wikidata:
             results["wikidata"] = execute_fetcher("wikidata")
+        if args.wikipedia:
+            results["wikipedia"] = execute_fetcher("wikipedia")
         if args.eol:
             results["eol"] = execute_fetcher("eol")
         if args.fishbase:
