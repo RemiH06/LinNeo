@@ -114,14 +114,14 @@ AVAILABLE_FETCHERS = {
         "time_estimate": "2-3 horas",
         "priority": "NICE-TO-HAVE"
     },
-    "inaturalist": {
-        "name": "iNaturalist - Imágenes",
-        "description": "Descarga URLs de imágenes de especies",
-        "module": "inaturalist_fetcher",
-        "function": "fetch_inaturalist_images",
-        "output": "biodiversity_data/inaturalist/inaturalist_images.csv",
-        "time_estimate": "2-3 horas",
-        "priority": "NICE-TO-HAVE"
+    "images": {
+        "name": "Wikimedia Commons - Imágenes",
+        "description": "URLs de imagenes principales (Wikidata P18)",
+        "module": "wikimedia_images_fetcher",
+        "function": "fetch_wikimedia_images",
+        "output": "biodiversity_data/images/wikimedia_images.csv",
+        "time_estimate": "1-2 horas",
+        "priority": "IMPORTANTE"
     }
 }
 
@@ -130,11 +130,11 @@ EXECUTION_ORDER = [
     "wikidata",      # Primero nombres comunes
     "wikipedia",     # Descripciones (principal)
     "eol",           # Descripciones (respaldo)
-    "fishbase",      # Luego especializados
+    "images",        # Imagenes
+    "fishbase",      # Especializados
     "powo",
     "amphibiaweb",
-    "xeno_canto",
-    "inaturalist"
+    "xeno_canto"     # Sonidos
 ]
 
 
@@ -333,16 +333,16 @@ Ejemplos:
     )
     
     parser.add_argument(
-        "--inaturalist",
+        "--images",
         action="store_true",
-        help="Ejecuta solo iNaturalist"
+        help="Ejecuta solo Imagenes (Wikimedia Commons)"
     )
     
     args = parser.parse_args()
     
     # Si no hay argumentos
     if not any([args.all, args.list, args.wikidata, args.wikipedia, args.eol, args.fishbase, 
-                args.powo, args.amphibiaweb, args.xeno_canto, args.inaturalist]):
+                args.powo, args.amphibiaweb, args.xeno_canto, args.images]):
         parser.print_help()
         return
     
@@ -372,8 +372,8 @@ Ejemplos:
             results["amphibiaweb"] = execute_fetcher("amphibiaweb")
         if args.xeno_canto:
             results["xeno_canto"] = execute_fetcher("xeno_canto")
-        if args.inaturalist:
-            results["inaturalist"] = execute_fetcher("inaturalist")
+        if args.images:
+            results["images"] = execute_fetcher("images")
         
         # Resumen
         print(f"\nResultados: {sum(results.values())}/{len(results)} exitosos")
