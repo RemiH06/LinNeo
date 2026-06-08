@@ -371,7 +371,7 @@ Ejemplos:
         if args.amphibiaweb:
             results["amphibiaweb"] = execute_fetcher("amphibiaweb")
         if args.xeno_canto:
-            results["xeno_canto"] = execute_fetcher("xeno_canto")
+            results["xeno"] = execute_fetcher("xeno_canto")
         if args.images:
             results["images"] = execute_fetcher("images")
         
