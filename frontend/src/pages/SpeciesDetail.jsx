@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import { Card, Badge, Metric, Callout } from '../components/ui'
-import RelativesTree from '../components/RelativesTree'
-import DistributionMap from '../components/DistributionMap'
+import TaxonomyGraph from '../components/TaxonomyGraph'
+import DistributionMap, { isoToName } from '../components/DistributionMap'
 
 const SOURCE_VARIANT = {
   wikipedia: 'arctic', powo: 'pine', fishbase: 'teal',
@@ -37,7 +37,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
 
   return (
     <div className="triptych">
-      {/* ══ IZQUIERDA (20%) — ficha tecnica + arbol taxonomico ══ */}
+      {/* ══ IZQUIERDA (30%) — ficha tecnica + grafo taxonomico ══ */}
       <aside className="col-left">
         <div className="panel">
           <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.5px', fontStyle: 'italic', lineHeight: 1.3 }}>
@@ -70,31 +70,19 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           </div>
         </div>
 
-        {/* Linaje completo */}
-        {lineage.length > 0 && (
-          <div className="panel">
-            <h3>Linaje</h3>
-            <div style={{ fontSize: 11 }}>
-              {lineage.map((node, i) => (
-                <div key={i} style={{ paddingLeft: i * 10, color: i === lineage.length - 1 ? 'var(--accent)' : 'var(--text2)', padding: '2px 0' }}>
-                  <span className="pipeline-step" style={{ marginRight: 6 }}>{node.rank.slice(0, 3)}</span>
-                  {node.name}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Arbol de parentesco */}
-        {data.relatives && (
-          <div className="panel">
-            <h3>Parentesco</h3>
-            <RelativesTree relatives={data.relatives} currentName={data.canonical_name || title} />
-          </div>
-        )}
+        {/* Grafo interactivo: linaje + parentesco */}
+        <div className="panel">
+          <h3>Taxonomia y parentesco</h3>
+          <TaxonomyGraph
+            lineage={lineage}
+            relatives={data.relatives}
+            currentName={data.canonical_name || title}
+            currentKey={data.species_key}
+          />
+        </div>
       </aside>
 
-      {/* ══ CENTRO (45%) — descripcion + imagenes ══ */}
+      {/* ══ CENTRO (40%) — descripcion + mapa ══ */}
       <main className="col-center">
         {data.descriptions?.length > 0 ? (
           <>
@@ -117,21 +105,24 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           <Callout title="Sin descripcion">No hay descripcion registrada para esta especie.</Callout>
         )}
 
-        {images.length > 0 && (
+        {data.countries?.length > 0 && (
           <>
-            <h2>Imagenes</h2>
-            <div className="media-grid-lg">
-              {images.map((m, i) => (
-                <div key={i} className="media-thumb-lg" onClick={() => onOpenMedia?.({ type: 'image', items: images, index: i })} title="Abrir galeria">
-                  <img src={m.url} alt={data.canonical_name} loading="lazy" />
-                </div>
-              ))}
+            <h2>Distribucion</h2>
+            <DistributionMap countries={data.countries} />
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
+              {(data.continents || []).map((c, i) => <Badge key={i} variant="accent">{c}</Badge>)}
             </div>
+            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+              {data.countries.length} {data.countries.length === 1 ? 'pais' : 'paises'}: {data.countries.map(isoToName).slice(0, 12).join(', ')}{data.countries.length > 12 ? '...' : ''}
+            </p>
+            <button className="btn primary" style={{ marginTop: 8 }} onClick={() => onOpenMedia?.({ type: 'map', countries: data.countries })}>
+              Ver mapa completo
+            </button>
           </>
         )}
       </main>
 
-      {/* ══ DERECHA (35%) — audio + mapa ══ */}
+      {/* ══ DERECHA (30%) — audio + imagenes ══ */}
       <aside className="col-right">
         {sounds.length > 0 && (
           <div className="panel">
@@ -153,22 +144,18 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           </div>
         )}
 
-        <div className="panel">
-          <h3>Distribucion</h3>
-          {data.countries?.length > 0 ? (
-            <>
-              <DistributionMap countries={data.countries} />
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
-                {(data.continents || []).map((c, i) => <Badge key={i} variant="accent">{c}</Badge>)}
-              </div>
-              <button className="btn primary" style={{ marginTop: 8 }} onClick={() => onOpenMedia?.({ type: 'map', countries: data.countries })}>
-                Ver mapa completo
-              </button>
-            </>
-          ) : (
-            <p className="muted">Sin datos de distribucion.</p>
-          )}
-        </div>
+        {images.length > 0 && (
+          <div className="panel">
+            <h3>Imagenes</h3>
+            <div className="media-grid-side">
+              {images.map((m, i) => (
+                <div key={i} className="media-thumb-lg" onClick={() => onOpenMedia?.({ type: 'image', items: images, index: i })} title="Abrir galeria">
+                  <img src={m.url} alt={data.canonical_name} loading="lazy" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </aside>
     </div>
   )

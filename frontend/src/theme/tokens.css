@@ -170,7 +170,7 @@ audio { width: 100%; margin: 6px 0; }
 ============================================================ */
 .triptych {
   display: grid;
-  grid-template-columns: 20% 45% 35%;
+  grid-template-columns: 30% 40% 30%;
   gap: 18px;
   align-items: start;
 }
@@ -213,3 +213,7 @@ audio { width: 100%; margin: 6px 0; }
 
 /* Leaflet: que los popups/controles hereden la fuente */
 .leaflet-container { font-family: var(--mono); }
+
+/* imagenes en columna lateral derecha (apiladas) */
+.media-grid-side { display: flex; flex-direction: column; gap: 8px; }
+.media-grid-side .media-thumb-lg { aspect-ratio: 4/3; width: 100%; }
