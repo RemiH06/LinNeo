@@ -72,6 +72,7 @@ def species_detail(species_key: int):
     if detail is None:
         raise HTTPException(status_code=404, detail="Especie no encontrada")
     detail["lineage"] = queries.get_taxonomy_path(species_key)
+    detail["relatives"] = queries.get_relatives(species_key)
     return detail
 
 

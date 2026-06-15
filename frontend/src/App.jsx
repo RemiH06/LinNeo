@@ -71,12 +71,10 @@ export default function App() {
     <ThemeProvider>
       <ElixirGraph />
       <BrowserRouter>
-        <div className="page">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/species/:key" element={<SpeciesPage />} />
-          </Routes>
-        </div>
+        <Routes>
+          <Route path="/" element={<div className="page"><Home /></div>} />
+          <Route path="/species/:key" element={<div className="page wide"><SpeciesPage /></div>} />
+        </Routes>
       </BrowserRouter>
     </ThemeProvider>
   )

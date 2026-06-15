@@ -86,6 +86,50 @@ def get_taxonomy_path(species_key: int):
     return rows[0]["lineage"] if rows else []
 
 
+def get_relatives(species_key: int, max_per_group: int = 40):
+    """
+    Arbol de parentesco de dos niveles para la especie dada:
+    - Familia (ancestro) -> generos hermanos (hijos de la familia)
+    - dentro del genero propio -> especies hermanas (hijos del genero)
+
+    Estructura devuelta:
+    {
+      family: {name, key},
+      genus:  {name, key},
+      sibling_genera: [{name, key}, ...],   # otros generos de la familia
+      sibling_species: [{name, key}, ...],  # otras especies del mismo genero
+    }
+    """
+    cypher = """
+    MATCH (g:Genus)-[:HAS_CHILD]->(s:Species {species_key: $key})
+    OPTIONAL MATCH (f:Family)-[:HAS_CHILD]->(g)
+    // especies hermanas (mismo genero, excluyendo la actual)
+    OPTIONAL MATCH (g)-[:HAS_CHILD]->(sib:Species)
+      WHERE sib.species_key <> $key
+    WITH g, f, collect(DISTINCT {
+        name: coalesce(sib.canonical_name, sib.scientific_name),
+        key: sib.species_key
+    })[0..$lim] AS sibling_species
+    // generos hermanos (misma familia, excluyendo el propio)
+    OPTIONAL MATCH (f)-[:HAS_CHILD]->(sg:Genus)
+      WHERE sg <> g
+    RETURN
+      CASE WHEN f IS NOT NULL THEN {name: coalesce(f.canonical_name, f.name), key: null} ELSE null END AS family,
+      {name: coalesce(g.canonical_name, g.name), key: null} AS genus,
+      collect(DISTINCT {name: coalesce(sg.canonical_name, sg.name), key: null})[0..$lim] AS sibling_genera,
+      sibling_species
+    LIMIT 1
+    """
+    rows = run_query(cypher, {"key": species_key, "lim": max_per_group})
+    if not rows:
+        return {}
+    row = rows[0]
+    # limpiar entradas nulas
+    row["sibling_species"] = [x for x in (row.get("sibling_species") or []) if x.get("name")]
+    row["sibling_genera"] = [x for x in (row.get("sibling_genera") or []) if x.get("name")]
+    return row
+
+
 def filter_species(kingdom: str = None, country: str = None, habit: str = None, limit: int = 50):
     """Filtra especies por reino, pais y/o habito."""
     conditions = []
