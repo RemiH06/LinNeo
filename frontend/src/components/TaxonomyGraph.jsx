@@ -26,11 +26,12 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
   }
   let prev = null
   for (const n of lineage) {
-    const id = add(n.rank, n.name, { current: n.name === currentName })
+    const cap = n.rank ? n.rank.charAt(0).toUpperCase() + n.rank.slice(1).toLowerCase() : 'Species'
+    const id = add(cap, n.name, { current: n.name === currentName, key: n.key, taxonRank: n.rank })
     if (prev) links.push({ source: prev, target: id })
     prev = id
   }
-  const currentId = add('Species', currentName, { current: true, key: currentKey })
+  const currentId = add('Species', currentName, { current: true, key: currentKey, taxonRank: 'species' })
   if (prev && prev !== currentId && !links.find((l) => l.target === currentId)) {
     links.push({ source: prev, target: currentId })
   }
@@ -38,14 +39,19 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
     const famId = relatives.family?.name ? idOf('Family', relatives.family.name) : null
     const genId = relatives.genus?.name ? idOf('Genus', relatives.genus.name) : null
     if (famId) {
+      // asegurar que el nodo familia tenga su key
+      const fam = nodes.find((x) => x.id === famId)
+      if (fam) { fam.key = relatives.family.key; fam.taxonRank = 'family' }
       for (const g of (relatives.sibling_genera || [])) {
-        const gid = add('Genus', g.name, { sibling: true })
+        const gid = add('Genus', g.name, { sibling: true, key: g.key, taxonRank: 'genus' })
         links.push({ source: famId, target: gid })
       }
     }
     if (genId) {
+      const gen = nodes.find((x) => x.id === genId)
+      if (gen) { gen.key = relatives.genus.key; gen.taxonRank = 'genus' }
       for (const sp of (relatives.sibling_species || [])) {
-        const sid = add('Species', sp.name, { sibling: true, key: sp.key })
+        const sid = add('Species', sp.name, { sibling: true, key: sp.key, taxonRank: 'species' })
         links.push({ source: genId, target: sid })
       }
     }
@@ -206,7 +212,9 @@ export default function TaxonomyGraph({ lineage = [], relatives, currentName, cu
       if (draggingNode) {
         // si no hubo arrastre real, tratarlo como clic -> navegar
         if (!moved && draggingNode.key && !draggingNode.current) {
-          navRef.current(`/species/${draggingNode.key}`)
+          const r = draggingNode.taxonRank || 'species'
+          if (r === 'species') navRef.current(`/species/${draggingNode.key}`)
+          else navRef.current(`/taxon/${r}/${draggingNode.key}`)
         }
         draggingNode.fx = null; draggingNode.fy = null
         sim.alphaTarget(0)

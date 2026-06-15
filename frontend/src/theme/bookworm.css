@@ -1,0 +1,36 @@
+/* ============================================================
+   LinNeo -- Tema bookworm (vistas de media y nodos taxonomicos)
+   Se activa envolviendo la vista en .bookworm-scope
+============================================================ */
+.bookworm-scope {
+  --bw-bg:#E8E0D0; --bw-bg2:#DDD5C0; --bw-bg3:#CEC4AC; --bw-text:#1C160C; --bw-text2:#5A4E38;
+  --bw-border:#B8A888; --bw-moss:#4A6040; --bw-bark:#6A4828; --bw-ochre:#B08030; --bw-amber:#C89040;
+  --bw-accent:#4A6040; --bw-accent2:#B08030; --bw-danger:#8A3020;
+  --bw-serif:'Libre Baskerville', Georgia, serif; --bw-mono:'Fira Code', monospace; --bw-radius:3px;
+  background: var(--bw-bg);
+  color: var(--bw-text);
+  font-family: var(--bw-serif);
+  min-height: 100vh;
+}
+body.dark .bookworm-scope {
+  --bw-bg:#0C100A; --bw-bg2:#121810; --bw-bg3:#1A2016; --bw-text:#D8E0C8; --bw-text2:#8A9878;
+  --bw-border:#2A3824; --bw-moss:#5A7850; --bw-bark:#5A3818; --bw-ochre:#988040; --bw-amber:#A87830;
+  --bw-accent:#5A7850; --bw-accent2:#988040; --bw-danger:#983020;
+}
+.bookworm-scope .bw-page { max-width: 980px; margin: 0 auto; padding: 40px; position: relative; z-index: 2; }
+.bookworm-scope h1 { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin-bottom: 4px; }
+.bookworm-scope h2 { font-family: var(--bw-mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--bw-accent); margin: 28px 0 12px; border-bottom: 1px solid var(--bw-border); padding-bottom: 6px; }
+.bookworm-scope .bw-muted { color: var(--bw-text2); font-family: var(--bw-mono); font-size: 12px; }
+.bookworm-scope .bw-rank { font-family: var(--bw-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: var(--bw-accent2); }
+.bookworm-scope .bw-children { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.bookworm-scope .bw-child {
+  background: var(--bw-bg2); border: 1px solid var(--bw-border); border-left: 3px solid var(--bw-moss);
+  border-radius: var(--bw-radius); padding: 10px 14px; cursor: pointer; transition: all .15s; font-size: 14px;
+}
+.bookworm-scope .bw-child:hover { border-left-color: var(--bw-amber); transform: translateX(2px); }
+.bookworm-scope .bw-btn {
+  font-family: var(--bw-mono); font-size: 12px; padding: 7px 16px; border: 1px solid var(--bw-border);
+  border-radius: var(--bw-radius); background: var(--bw-bg2); color: var(--bw-text2); cursor: pointer; letter-spacing: .04em;
+}
+.bookworm-scope .bw-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }
+.bookworm-scope .bw-map { border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; margin: 12px 0; }

@@ -88,3 +88,17 @@ def filter_species(
         "filters": {"kingdom": kingdom, "country": country, "habit": habit},
         "results": queries.filter_species(kingdom, country, habit, limit),
     }
+
+
+@app.get("/taxon/{rank}/{key}")
+def taxon_node(rank: str, key: int):
+    """Vista de un nodo taxonomico no-especie: hijos directos + paises agregados."""
+    node = queries.get_taxon_node(rank, key)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
+    return node
+
+#? No sé qué le pasó al main pero ya no muestra las cosas como deberían estar.
+#! El color en los nodos del grafo taxonómico desapareció, corrígelo
+#* Fue un día productivo, por favor vete a dormir.
+# TODO dormir

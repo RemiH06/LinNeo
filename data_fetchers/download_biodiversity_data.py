@@ -701,25 +701,25 @@ class BiodiversityDataDownloader:
                 return pd.DataFrame()
 
         print(f"  Leyendo {tsv_path} (puede tardar, ~471MB)...")
-        usecols = ['taxonID', 'countryCode', 'establishmentMeans', 'occurrenceStatus', 'threatStatus']
-        df = pd.read_csv(tsv_path, sep='\t', dtype=str, keep_default_na=False, usecols=usecols)
-        print(f"  {len(df):,} filas leídas")
+        usecols = ['taxonID', 'locality', 'countryCode', 'establishmentMeans', 'occurrenceStatus', 'threatStatus']
+        raw = pd.read_csv(tsv_path, sep='\t', dtype=str, keep_default_na=False, usecols=usecols)
+        print(f"  {len(raw):,} filas leídas")
 
-        df = df[(df['taxonID'] != '') & (df['countryCode'] != '')].copy()
-        df['countryCode'] = df['countryCode'].str.upper().str.strip()
-        df['establishmentMeans'] = df['establishmentMeans'].str.lower().str.strip()
-        df['occurrenceStatus'] = df['occurrenceStatus'].str.lower().str.strip()
-        df['threatStatus'] = df['threatStatus'].str.lower().str.strip()
+        raw['species_key'] = pd.to_numeric(raw['taxonID'], errors='coerce')
+        raw = raw.dropna(subset=['species_key'])
+        raw['species_key'] = raw['species_key'].astype(int)
+        raw['countryCode'] = raw['countryCode'].str.upper().str.strip()
+        raw['establishmentMeans'] = raw['establishmentMeans'].str.lower().str.strip()
+        raw['occurrenceStatus'] = raw['occurrenceStatus'].str.lower().str.strip()
+        raw['threatStatus'] = raw['threatStatus'].str.lower().str.strip()
+        raw['locality'] = raw['locality'].str.strip()
 
-        df['species_key'] = pd.to_numeric(df['taxonID'], errors='coerce')
-        df = df.dropna(subset=['species_key'])
-        df['species_key'] = df['species_key'].astype(int)
-
+        # ── Filas de PAIS (con countryCode) -> relaciones especie-pais ──
+        df = raw[raw['countryCode'] != ''].copy()
         df['cons_code'] = df['threatStatus'].map(lambda t: self.IUCN_STATUS.get(t, ('', 0))[0])
         df['cons_sev'] = df['threatStatus'].map(lambda t: self.IUCN_STATUS.get(t, ('', 0))[1])
         df['em_prio'] = df['establishmentMeans'].map(lambda e: self.EM_PRIORITY.get(e, 0))
 
-        # Dedup por (especie, pais): mayor prioridad de establishmentMeans y, en empate, peor conservacion
         df_sorted = df.sort_values(['em_prio', 'cons_sev'], ascending=False)
         dist = df_sorted.drop_duplicates(subset=['species_key', 'countryCode'], keep='first')
         print(f"  {len(dist):,} pares (especie, país) únicos en {dist['countryCode'].nunique()} países")
@@ -736,17 +736,19 @@ class BiodiversityDataDownloader:
         out.to_csv(output_file, index=False)
         print(f"Relaciones especie-país: {output_file} ({len(out):,} relaciones)")
 
-        # Estado de conservacion general por especie (peor caso)
-        idx = df.groupby('species_key')['cons_sev'].idxmax()
-        cons = df.loc[idx]
-        cons = cons[cons['cons_sev'] > 0]
-        cons_out = cons[['species_key', 'threatStatus', 'cons_code']].rename(columns={
+        # ── Conservacion OFICIAL: fila locality == 'Global' (evaluacion IUCN global) ──
+        glob = raw[(raw['locality'] == 'Global') & (raw['threatStatus'] != '')].copy()
+        glob['cons_sev'] = glob['threatStatus'].map(lambda t: self.IUCN_STATUS.get(t, ('', 0))[1])
+        glob['cons_code'] = glob['threatStatus'].map(lambda t: self.IUCN_STATUS.get(t, ('', 0))[0])
+        # si una especie tuviera varias filas Global, quedarse con la peor
+        glob = glob.sort_values('cons_sev', ascending=False).drop_duplicates(subset=['species_key'], keep='first')
+        cons_out = glob[['species_key', 'threatStatus', 'cons_code']].rename(columns={
             'threatStatus': 'conservation_overall',
             'cons_code': 'conservation_overall_code',
         })
         cons_file = self.output_dir / "species_conservation.csv"
         cons_out.to_csv(cons_file, index=False)
-        print(f"Conservación por especie: {cons_file} ({len(cons_out):,} especies)")
+        print(f"Conservación (Global/IUCN oficial): {cons_file} ({len(cons_out):,} especies)")
 
         # devolver los codigos de pais para construir la jerarquia acorde
         self._distribution_country_codes = sorted(dist['countryCode'].unique())

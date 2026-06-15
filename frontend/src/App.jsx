@@ -4,6 +4,7 @@ import { ThemeProvider } from './theme/ThemeContext'
 import ElixirGraph from './backgrounds/ElixirGraph'
 import ThemeToggle from './components/ThemeToggle'
 import SpeciesDetail from './pages/SpeciesDetail'
+import TaxonNode from './pages/TaxonNode'
 import { Callout } from './components/ui'
 
 function Header() {
@@ -74,8 +75,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<div className="page"><Home /></div>} />
           <Route path="/species/:key" element={<div className="page wide"><SpeciesPage /></div>} />
+          <Route path="/taxon/:rank/:key" element={<TaxonPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
   )
+}
+
+function TaxonPage() {
+  const { rank, key } = useParams()
+  return <TaxonNode rank={rank} nodeKey={key} />
 }

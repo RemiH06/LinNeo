@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api/client'
+import { api, IUCN } from '../api/client'
 import { Card, Badge, Metric, Callout } from '../components/ui'
 import TaxonomyGraph from '../components/TaxonomyGraph'
 import DistributionMap, { isoToName } from '../components/DistributionMap'
@@ -8,7 +8,24 @@ const SOURCE_VARIANT = {
   wikipedia: 'arctic', powo: 'pine', fishbase: 'teal',
   amphibiaweb: 'violet', eol: 'indigo',
 }
-const RANK_ORDER = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
+const RANK_ORDER = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+
+function ConservationBadge({ code, status }) {
+  if (!code) return null
+  const info = IUCN[code] || { label: status || code, color: 'var(--text2)' }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700,
+      padding: '3px 9px', borderRadius: 'var(--radius)',
+      border: `1px solid ${info.color}`, color: info.color,
+      letterSpacing: '.05em',
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: info.color }} />
+      {code} - {info.label}
+    </span>
+  )
+}
 
 export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const [data, setData] = useState(null)
@@ -31,13 +48,17 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const images = (data.media || []).filter((m) => m.type === 'image')
   const sounds = (data.media || []).filter((m) => m.type === 'sound')
   const commonNames = data.common_names || []
+  const distribution = data.distribution || []
   const lineage = (data.lineage || []).slice()
     .sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
   const title = data.scientific_name || data.canonical_name
 
+  // conservacion por pais (solo los que tienen codigo), para el detalle
+  const consByCountry = distribution.filter((d) => d.conservation_code)
+
   return (
     <div className="triptych">
-      {/* ══ IZQUIERDA (30%) — ficha tecnica + grafo taxonomico ══ */}
+      {/* ══ IZQUIERDA — ficha tecnica + grafo ══ */}
       <aside className="col-left">
         <div className="panel">
           <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.5px', fontStyle: 'italic', lineHeight: 1.3 }}>
@@ -51,6 +72,14 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
             {data.kingdom && <Badge variant="accent">{data.kingdom}</Badge>}
             {data.habit && <Badge variant="teal">{data.habit}</Badge>}
           </div>
+
+          {/* Estado de conservacion general (peor caso) */}
+          {data.conservation_overall_code && (
+            <div style={{ margin: '10px 0' }}>
+              <h3 style={{ margin: '8px 0 5px' }}>Conservacion</h3>
+              <ConservationBadge code={data.conservation_overall_code} status={data.conservation_overall} />
+            </div>
+          )}
 
           {commonNames.length > 0 && (
             <div style={{ marginBottom: 10 }}>
@@ -66,11 +95,10 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
             <Metric value={data.descriptions?.length || 0} label="DESCRIPCIONES" />
             <Metric value={images.length} label="IMAGENES" variant="teal" />
             <Metric value={sounds.length} label="SONIDOS" variant="violet" />
-            <Metric value={data.countries?.length || 0} label="PAISES" variant="arctic" />
+            <Metric value={distribution.length} label="PAISES" variant="arctic" />
           </div>
         </div>
 
-        {/* Grafo interactivo: linaje + parentesco */}
         <div className="panel">
           <h3>Taxonomia y parentesco</h3>
           <TaxonomyGraph
@@ -82,7 +110,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
         </div>
       </aside>
 
-      {/* ══ CENTRO (40%) — descripcion + mapa ══ */}
+      {/* ══ CENTRO — descripcion + mapa ══ */}
       <main className="col-center">
         {data.descriptions?.length > 0 ? (
           <>
@@ -105,24 +133,36 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           <Callout title="Sin descripcion">No hay descripcion registrada para esta especie.</Callout>
         )}
 
-        {data.countries?.length > 0 && (
+        {distribution.length > 0 && (
           <>
             <h2>Distribucion</h2>
-            <DistributionMap countries={data.countries} />
+            <DistributionMap distribution={distribution} continents={data.continents || []} />
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
               {(data.continents || []).map((c, i) => <Badge key={i} variant="accent">{c}</Badge>)}
             </div>
-            <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
-              {data.countries.length} {data.countries.length === 1 ? 'pais' : 'paises'}: {data.countries.map(isoToName).slice(0, 12).join(', ')}{data.countries.length > 12 ? '...' : ''}
-            </p>
-            <button className="btn primary" style={{ marginTop: 8 }} onClick={() => onOpenMedia?.({ type: 'map', countries: data.countries })}>
+
+            {/* Conservacion por pais, si hay */}
+            {consByCountry.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <h3>Conservacion por pais</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {consByCountry.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11 }}>
+                      <span style={{ minWidth: 130 }}>{isoToName(d.country)}</span>
+                      <ConservationBadge code={d.conservation_code} status={d.conservation_status} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button className="btn primary" style={{ marginTop: 8 }} onClick={() => onOpenMedia?.({ type: 'map', distribution })}>
               Ver mapa completo
             </button>
           </>
         )}
       </main>
 
-      {/* ══ DERECHA (30%) — audio + imagenes ══ */}
+      {/* ══ DERECHA — audio + imagenes ══ */}
       <aside className="col-right">
         {sounds.length > 0 && (
           <div className="panel">
