@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useTheme } from '../theme/ThemeContext'
+import { useKingdom } from '../theme/KingdomContext'
+import { KINGDOM_HUE } from '../theme/kingdomColor'
 
 // Grafo neural animado de fondo, portado del demo elixir.
 const PALETTES = {
@@ -8,11 +10,23 @@ const PALETTES = {
 }
 const N = 40, DIST = 150, SPEED = 0.25
 
+// Paleta derivada del hue del reino: varios shades del mismo matiz.
+function kingdomPalette(kingdom, dark) {
+  const h = KINGDOM_HUE[kingdom]
+  const gray = (kingdom === 'incertae sedis' || h == null)
+  const hue = gray ? 210 : h
+  const sat = gray ? 10 : (dark ? 85 : 70)
+  const lights = dark ? [42, 50, 58, 66, 74, 60] : [22, 28, 34, 40, 46, 32]
+  const nodes = lights.map((L) => `hsl(${hue}, ${sat}%, ${L}%)`)
+  return { nodes, pulse: nodes.slice(0, 5), edge: dark ? '#2A3A5A' : '#B8BDD0' }
+}
+
 export default function ElixirGraph() {
   const canvasRef = useRef(null)
   const { dark } = useTheme()
-  const darkRef = useRef(dark)
-  darkRef.current = dark
+  const { kingdom } = useKingdom()
+  const darkRef = useRef(dark); darkRef.current = dark
+  const kingdomRef = useRef(kingdom); kingdomRef.current = kingdom
 
   useEffect(() => {
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -22,7 +36,10 @@ export default function ElixirGraph() {
     const ctx = canvas.getContext('2d')
     let W, H, nodes = [], raf, last = 0, pulseTimer
 
-    const pal = () => (darkRef.current ? PALETTES.dark : PALETTES.light)
+    const pal = () => {
+      if (kingdomRef.current) return kingdomPalette(kingdomRef.current, darkRef.current)
+      return darkRef.current ? PALETTES.dark : PALETTES.light
+    }
     const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)]
     const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight }
     const makeNode = () => ({
@@ -36,8 +53,18 @@ export default function ElixirGraph() {
       if (n) { n.pColor = rnd(pal().pulse); n.pT = 0; n.pDur = 600 + Math.random() * 900 }
       pulseTimer = setTimeout(spawnPulse, 250 + Math.random() * 900)
     }
+    // recolorea los nodos cuando cambia el reino o el tema, sin reiniciar posiciones
+    let lastKey = ''
+    const maybeRecolor = () => {
+      const key = (kingdomRef.current || 'elixir') + (darkRef.current ? 'D' : 'L')
+      if (key === lastKey) return
+      lastKey = key
+      const p = pal()
+      for (const n of nodes) if (!n.pColor) n.color = rnd(p.nodes)
+    }
     const draw = (ts) => {
       const dt = Math.min(ts - last, 50); last = ts
+      maybeRecolor()
       ctx.clearRect(0, 0, W, H)
       const p = pal()
       for (let i = 0; i < nodes.length; i++) {

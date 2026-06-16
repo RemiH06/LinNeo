@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom'
 import { ThemeProvider } from './theme/ThemeContext'
+import { KingdomProvider } from './theme/KingdomContext'
 import ElixirGraph from './backgrounds/ElixirGraph'
+import KingdomBackdrop from './backgrounds/KingdomBackdrop'
 import ThemeToggle from './components/ThemeToggle'
 import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
+import ErrorBoundary from './components/ErrorBoundary'
 import { Callout } from './components/ui'
 
 function Header() {
@@ -70,14 +73,17 @@ function SpeciesPage() {
 export default function App() {
   return (
     <ThemeProvider>
-      <ElixirGraph />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<div className="page"><Home /></div>} />
-          <Route path="/species/:key" element={<div className="page wide"><SpeciesPage /></div>} />
-          <Route path="/taxon/:rank/:key" element={<TaxonPage />} />
-        </Routes>
-      </BrowserRouter>
+      <KingdomProvider>
+        <KingdomBackdrop />
+        <ElixirGraph />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<div className="page"><Home /></div>} />
+            <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />
+            <Route path="/taxon/:rank/:key" element={<ErrorBoundary><TaxonPage /></ErrorBoundary>} />
+          </Routes>
+        </BrowserRouter>
+      </KingdomProvider>
     </ThemeProvider>
   )
 }

@@ -156,7 +156,8 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
     # Info del nodo
     name_cypher = f"""
     MATCH (n:{label} {{{keyprop}: $key}})
-    RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name
+    RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name,
+           n.kingdom AS kingdom
     LIMIT 1
     """
     nrows = run_query(name_cypher, {"key": key})
@@ -216,11 +217,27 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
 
     node = {
         "name": nrows[0]["name"],
+        "kingdom": nrows[0]["kingdom"],
         "rank": rank,
         "key": key,
         "child_rank": child_rank,
         "children": children,
     }
+
+    # Linaje (ancestros) del nodo, para el grafo de navegacion
+    lineage_cypher = f"""
+    MATCH (n:{label} {{{keyprop}: $key}})
+    OPTIONAL MATCH path = (k:Kingdom)-[:HAS_CHILD*]->(n)
+    WITH nodes(path) AS chain
+    RETURN [x IN chain | {{
+        rank: toLower(labels(x)[0]),
+        name: coalesce(x.canonical_name, x.name, x.scientific_name),
+        key: coalesce(x.kingdom_key, x.phylum_key, x.class_key, x.order_key, x.family_key, x.genus_key)
+    }}] AS lineage
+    LIMIT 1
+    """
+    lrows = run_query(lineage_cypher, {"key": key})
+    node["lineage"] = lrows[0]["lineage"] if lrows and lrows[0]["lineage"] else []
 
     # Paises agregados de las especies descendientes (para el mapa)
     countries_cypher = f"""

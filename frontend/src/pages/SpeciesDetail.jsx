@@ -3,6 +3,9 @@ import { api, IUCN } from '../api/client'
 import { Card, Badge, Metric, Callout } from '../components/ui'
 import TaxonomyGraph from '../components/TaxonomyGraph'
 import DistributionMap, { isoToName } from '../components/DistributionMap'
+import { useTheme } from '../theme/ThemeContext'
+import { kingdomStyleVars } from '../theme/kingdomColor'
+import { useSetKingdom } from '../theme/KingdomContext'
 
 const SOURCE_VARIANT = {
   wikipedia: 'arctic', powo: 'pine', fishbase: 'teal',
@@ -41,6 +44,8 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const { dark } = useTheme()
+  useSetKingdom(data?.kingdom)
 
   useEffect(() => {
     let alive = true
@@ -77,7 +82,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const consByCountry = distribution.filter((d) => d.conservation_code)
 
   return (
-    <div className="triptych">
+    <div className="triptych" style={kingdomStyleVars(data.kingdom, dark)}>
       {/* ══ IZQUIERDA — ficha tecnica + grafo ══ */}
       <aside className="col-left">
         <div className="panel">
@@ -126,6 +131,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
             relatives={data.relatives}
             currentName={data.canonical_name || title}
             currentKey={data.species_key}
+            kingdom={data.kingdom}
           />
         </div>
       </aside>

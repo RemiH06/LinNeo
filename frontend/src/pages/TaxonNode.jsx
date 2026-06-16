@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { api } from '../api/client'
+import TaxonGraph from '../components/TaxonGraph'
+import { useTheme } from '../theme/ThemeContext'
+import { kingdomStyleVars } from '../theme/kingdomColor'
+import { useSetKingdom } from '../theme/KingdomContext'
 import '../theme/bookworm.css'
 
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
@@ -78,6 +82,8 @@ export default function TaxonNode({ rank, nodeKey }) {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const { dark } = useTheme()
+  useSetKingdom(data?.kingdom)
 
   useEffect(() => {
     let alive = true
@@ -94,7 +100,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   }
 
   return (
-    <div className="bookworm-scope">
+    <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
       <div className="bw-page">
         <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
 
@@ -112,25 +118,44 @@ export default function TaxonNode({ rank, nodeKey }) {
               </p>
             </div>
 
-            {data.countries?.length > 0 && (
-              <>
-                <h2>Distribucion agregada</h2>
-                <p className="bw-muted">Paises donde habita alguna especie de este grupo ({data.countries.length}).</p>
-                <AggregateMap countries={data.countries} />
-              </>
-            )}
-
-            <h2>{RANK_ES[data.child_rank] || data.child_rank}s</h2>
-            <div className="bw-children">
-              {data.children.map((c, i) => (
-                <div key={i} className="bw-child" onClick={() => openChild(c)}>
-                  <div className="bw-rank">{RANK_ES[c.rank] || c.rank}</div>
-                  <div style={{ fontStyle: c.rank === 'species' ? 'italic' : 'normal' }}>{c.name}</div>
-                  <ContentFlags flags={c.flags} isSpecies={c.rank === 'species'} conservation={c.conservation} />
+            <div className="bw-layout">
+              {/* Izquierda: grafo de navegacion */}
+              <div className="bw-graph-col">
+                <h2>Navegacion</h2>
+                <div className="bw-map" style={{ padding: 6 }}>
+                  <TaxonGraph
+                    lineage={data.lineage || []}
+                    current={{ rank: data.rank, name: data.name, key: data.key }}
+                    children={data.children}
+                    kingdom={data.kingdom}
+                    height={300}
+                  />
                 </div>
-              ))}
+              </div>
+
+              {/* Derecha: mapa + lista de hijos */}
+              <div className="bw-main-col">
+                {data.countries?.length > 0 && (
+                  <>
+                    <h2>Distribucion agregada</h2>
+                    <p className="bw-muted">Paises donde habita alguna especie de este grupo ({data.countries.length}).</p>
+                    <AggregateMap countries={data.countries} />
+                  </>
+                )}
+
+                <h2>{RANK_ES[data.child_rank] || data.child_rank}s</h2>
+                <div className="bw-children">
+                  {data.children.map((c, i) => (
+                    <div key={i} className="bw-child" onClick={() => openChild(c)}>
+                      <div className="bw-rank">{RANK_ES[c.rank] || c.rank}</div>
+                      <div style={{ fontStyle: c.rank === 'species' ? 'italic' : 'normal' }}>{c.name}</div>
+                      <ContentFlags flags={c.flags} isSpecies={c.rank === 'species'} conservation={c.conservation} />
+                    </div>
+                  ))}
+                </div>
+                {data.children.length === 0 && <p className="bw-muted">Sin hijos directos registrados.</p>}
+              </div>
             </div>
-            {data.children.length === 0 && <p className="bw-muted">Sin hijos directos registrados.</p>}
           </>
         )}
       </div>

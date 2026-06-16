@@ -34,3 +34,12 @@ body.dark .bookworm-scope {
 }
 .bookworm-scope .bw-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }
 .bookworm-scope .bw-map { border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; margin: 12px 0; }
+
+/* Layout de 2 columnas en TaxonNode: grafo (izq, sticky) + contenido (der) */
+.bookworm-scope .bw-layout { display: grid; grid-template-columns: 38% 62%; gap: 20px; align-items: start; margin-top: 10px; }
+.bookworm-scope .bw-graph-col { position: sticky; top: 20px; }
+.bookworm-scope .bw-main-col { min-width: 0; }
+@media (max-width: 860px) {
+  .bookworm-scope .bw-layout { grid-template-columns: 1fr; }
+  .bookworm-scope .bw-graph-col { position: static; }
+}

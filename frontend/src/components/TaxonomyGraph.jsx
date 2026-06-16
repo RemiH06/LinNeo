@@ -59,7 +59,7 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
   return { nodes, links }
 }
 
-export default function TaxonomyGraph({ lineage = [], relatives, currentName, currentKey }) {
+export default function TaxonomyGraph({ lineage = [], relatives, currentName, currentKey, kingdom }) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const navigate = useNavigate()
@@ -73,7 +73,6 @@ export default function TaxonomyGraph({ lineage = [], relatives, currentName, cu
     const canvas = canvasRef.current
     const wrap = wrapRef.current
     const ctx = canvas.getContext('2d')
-    const colors = dark ? RANK_COLOR : RANK_COLOR_LIGHT
     const edgeColor = dark ? '#2A3A5A' : '#B8BDD0'
     const textColor = dark ? '#DCE0F0' : '#0E1018'
 
@@ -126,7 +125,7 @@ export default function TaxonomyGraph({ lineage = [], relatives, currentName, cu
         const r = radiusOf(n)
         ctx.beginPath()
         ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
-        ctx.fillStyle = colors[n.rank] || '#888'
+        ctx.fillStyle = (dark ? RANK_COLOR : RANK_COLOR_LIGHT)[n.rank] || '#888'
         ctx.globalAlpha = n.sibling ? 0.75 : 1
         ctx.fill()
         if (n.current) {
@@ -252,16 +251,20 @@ export default function TaxonomyGraph({ lineage = [], relatives, currentName, cu
       canvas.removeEventListener('wheel', onWheel)
       window.removeEventListener('resize', onResize)
     }
-  }, [lineage, relatives, currentName, currentKey, dark])
+  }, [lineage, relatives, currentName, currentKey, dark, kingdom])
+
+  const RANKS = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+  const RANK_ES = { kingdom: 'Reino', phylum: 'Filo', class: 'Clase', order: 'Orden', family: 'Familia', genus: 'Genero', species: 'Especie' }
+  const RANK_CAP = { kingdom: 'Kingdom', phylum: 'Phylum', class: 'Class', order: 'Order', family: 'Family', genus: 'Genus', species: 'Species' }
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', width: '100%' }}>
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: 360, touchAction: 'none' }} />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8, fontSize: 9 }}>
-        {Object.keys(RANK_COLOR).map((rank) => (
+        {RANKS.map((rank) => (
           <span key={rank} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text2)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: (dark ? RANK_COLOR : RANK_COLOR_LIGHT)[rank], display: 'inline-block' }} />
-            {rank}
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: (dark ? RANK_COLOR : RANK_COLOR_LIGHT)[RANK_CAP[rank]], display: 'inline-block' }} />
+            {RANK_ES[rank]}
           </span>
         ))}
       </div>
