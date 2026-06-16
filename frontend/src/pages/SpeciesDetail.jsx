@@ -10,6 +10,16 @@ const SOURCE_VARIANT = {
 }
 const RANK_ORDER = ['kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 
+// Etiquetas en espanol y orden de los tipos de descripcion del backbone
+const TYPE_LABEL = {
+  description: 'Descripcion', diagnosis: 'Diagnosis', biology: 'Biologia y ecologia',
+  habitat: 'Habitat', etymology: 'Etimologia', discussion: 'Discusion', habit: 'Habito',
+  reference: 'Referencias', type_specimen: 'Especimen tipo',
+}
+// orden de aparicion de las secciones
+const TYPE_ORDER = ['etymology', 'description', 'diagnosis', 'biology', 'habitat', 'habit', 'discussion', 'reference', 'type_specimen']
+const LANG_LABEL = { en: 'EN', es: 'ES', de: 'DE', fr: 'FR', pt: 'PT', it: 'IT' }
+
 function ConservationBadge({ code, status }) {
   if (!code) return null
   const info = IUCN[code] || { label: status || code, color: 'var(--text2)' }
@@ -49,6 +59,16 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const sounds = (data.media || []).filter((m) => m.type === 'sound')
   const commonNames = data.common_names || []
   const distribution = data.distribution || []
+  const allDescriptions = data.descriptions || []
+  // separar: las de Wikipedia/otras fuentes (sin type) van como "resumen";
+  // las del backbone se agrupan por type
+  const prose = allDescriptions.filter((d) => !d.type)
+  const byType = {}
+  for (const d of allDescriptions) {
+    if (!d.type) continue
+    ;(byType[d.type] ||= []).push(d)
+  }
+  const typedSections = TYPE_ORDER.filter((t) => byType[t]?.length)
   const lineage = (data.lineage || []).slice()
     .sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
   const title = data.scientific_name || data.canonical_name
@@ -112,21 +132,47 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
 
       {/* ══ CENTRO — descripcion + mapa ══ */}
       <main className="col-center">
-        {data.descriptions?.length > 0 ? (
+        {(prose.length > 0 || typedSections.length > 0) ? (
           <>
-            <h2>Descripcion</h2>
-            {data.descriptions.map((d, i) => (
-              <Card key={i}>
-                <div style={{ marginBottom: 8 }}>
-                  <Badge variant={SOURCE_VARIANT[d.source] || ''}>{d.source}</Badge>
-                </div>
-                <p style={{ marginBottom: 0 }}>{d.text}</p>
-                {d.url && (
-                  <div style={{ marginTop: 8 }}>
-                    <a href={d.url} target="_blank" rel="noreferrer">{'\u2197'} fuente original</a>
-                  </div>
+            {/* Resumen (Wikipedia y otras fuentes de prosa) */}
+            {prose.length > 0 && (
+              <>
+                <h2>Resumen</h2>
+                {prose.map((d, i) => (
+                  <Card key={i}>
+                    <div style={{ marginBottom: 8 }}>
+                      <Badge variant={SOURCE_VARIANT[d.source] || ''}>{d.source}</Badge>
+                    </div>
+                    <p style={{ marginBottom: 0 }}>{d.text}</p>
+                    {d.url && (
+                      <div style={{ marginTop: 8 }}>
+                        <a href={d.url} target="_blank" rel="noreferrer">{'\u2197'} fuente original</a>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {/* Secciones del backbone agrupadas por tipo */}
+            {typedSections.map((type) => (
+              <div key={type}>
+                <h2>{TYPE_LABEL[type] || type}</h2>
+                {byType[type].slice(0, type === 'reference' ? 8 : 6).map((d, i) => (
+                  <Card key={i}>
+                    <div style={{ marginBottom: 6, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {d.lang && <Badge>{LANG_LABEL[d.lang] || d.lang.toUpperCase()}</Badge>}
+                      {d.source && <span className="muted" style={{ fontSize: 10 }}>{d.source}</span>}
+                    </div>
+                    <p style={{ marginBottom: 0, fontSize: type === 'reference' ? 12 : undefined }}>{d.text}</p>
+                  </Card>
+                ))}
+                {byType[type].length > (type === 'reference' ? 8 : 6) && (
+                  <p className="muted" style={{ fontSize: 11 }}>
+                    +{byType[type].length - (type === 'reference' ? 8 : 6)} mas
+                  </p>
                 )}
-              </Card>
+              </div>
             ))}
           </>
         ) : (

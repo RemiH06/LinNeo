@@ -70,7 +70,7 @@ def get_species_detail(species_key: int):
            s.habit AS habit,
            s.conservation_overall AS conservation_overall,
            s.conservation_overall_code AS conservation_overall_code,
-           collect(DISTINCT {text: d.text, lang: d.lang, source: d.source_name, url: d.source_url}) AS descriptions,
+           collect(DISTINCT {text: d.text, lang: d.lang, type: d.type, source: d.source_name, url: d.source_url, origin: d.origin}) AS descriptions,
            collect(DISTINCT {type: m.media_type, url: m.url, source: m.source_name, source_url: m.source_url, license: m.license}) AS media,
            collect(DISTINCT {
                country: c.key,
@@ -143,7 +143,7 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
     """
     Vista de un nodo taxonomico no-especie (genero, familia, orden...):
       - info del nodo (nombre, rank)
-      - hijos directos (rango inmediato inferior) con su key
+      - hijos directos con flags de contenido (imagenes, sonidos, descripcion, etimologia)
       - paises agregados de TODAS las especies descendientes (para el mapa)
     """
     rank = rank.lower()
@@ -153,37 +153,83 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
     child_rank = CHILD_RANK.get(rank)
     child_label, child_keyprop = RANK_LABEL[child_rank]
 
-    # Info + hijos directos
-    info_cypher = f"""
+    # Info del nodo
+    name_cypher = f"""
     MATCH (n:{label} {{{keyprop}: $key}})
-    OPTIONAL MATCH (n)-[:HAS_CHILD]->(child:{child_label})
-    WITH n, child
-    ORDER BY coalesce(child.canonical_name, child.name, child.scientific_name)
-    RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name,
-           collect(DISTINCT {{
-               name: coalesce(child.canonical_name, child.name, child.scientific_name),
-               key: child.{child_keyprop},
-               rank: '{child_rank}'
-           }})[0..$climit] AS children
+    RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name
     LIMIT 1
     """
-    rows = run_query(info_cypher, {"key": key, "climit": child_limit})
-    if not rows:
+    nrows = run_query(name_cypher, {"key": key})
+    if not nrows:
         return None
-    node = rows[0]
-    node["children"] = [c for c in node["children"] if c.get("name")]
-    node["rank"] = rank
-    node["key"] = key
-    node["child_rank"] = child_rank
 
-    # Paises agregados de las especies descendientes (resultado pequeno aunque el recorrido sea grande)
+    # Hijos directos + flags de contenido.
+    # Si el hijo es especie, miramos su propio contenido; si es un taxon superior,
+    # agregamos el contenido de sus especies descendientes (EXISTS, barato).
+    if child_rank == "species":
+        children_cypher = f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:Species)
+        WITH c
+        ORDER BY coalesce(c.canonical_name, c.scientific_name)
+        LIMIT $climit
+        OPTIONAL MATCH (c)-[:HAS_MEDIA]->(mi:Media) WHERE mi.media_type = 'image'
+        OPTIONAL MATCH (c)-[:HAS_MEDIA]->(ms:Media) WHERE ms.media_type = 'sound'
+        OPTIONAL MATCH (c)-[:HAS_DESCRIPTION]->(d:Description)
+        OPTIONAL MATCH (c)-[:HAS_DESCRIPTION]->(et:Description) WHERE et.type = 'etymology'
+        OPTIONAL MATCH (c)-[:FOUND_IN]->(co:Country)
+        WITH c,
+             count(DISTINCT mi) AS n_img,
+             count(DISTINCT ms) AS n_snd,
+             count(DISTINCT d)  AS n_desc,
+             count(DISTINCT et) AS n_etym,
+             count(DISTINCT co) AS n_country
+        RETURN collect({{
+            name: coalesce(c.canonical_name, c.scientific_name),
+            key: c.species_key,
+            rank: 'species',
+            conservation: c.conservation_overall_code,
+            flags: {{images: n_img, sounds: n_snd, descriptions: n_desc, etymology: n_etym, countries: n_country}}
+        }}) AS children
+        """
+    else:
+        children_cypher = f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:{child_label})
+        WITH c
+        ORDER BY coalesce(c.canonical_name, c.name, c.scientific_name)
+        LIMIT $climit
+        OPTIONAL MATCH (c)-[:HAS_CHILD*]->(s:Species)
+        WITH c,
+             count(DISTINCT s) AS n_species,
+             count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'image'}}) }} THEN s END) AS sp_img,
+             count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'sound'}}) }} THEN s END) AS sp_snd,
+             count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }} THEN s END) AS sp_desc
+        RETURN collect({{
+            name: coalesce(c.canonical_name, c.name, c.scientific_name),
+            key: c.{child_keyprop},
+            rank: '{child_rank}',
+            flags: {{species: n_species, images: sp_img, sounds: sp_snd, descriptions: sp_desc}}
+        }}) AS children
+        """
+    crows = run_query(children_cypher, {"key": key, "climit": child_limit})
+    children = crows[0]["children"] if crows else []
+    children = [c for c in children if c.get("name")]
+
+    node = {
+        "name": nrows[0]["name"],
+        "rank": rank,
+        "key": key,
+        "child_rank": child_rank,
+        "children": children,
+    }
+
+    # Paises agregados de las especies descendientes (para el mapa)
     countries_cypher = f"""
     MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)-[:FOUND_IN]->(c:Country)
     RETURN collect(DISTINCT c.key) AS countries, count(DISTINCT s) AS species_count
     """
-    crows = run_query(countries_cypher, {"key": key})
-    node["countries"] = crows[0]["countries"] if crows else []
-    node["species_count"] = crows[0]["species_count"] if crows else 0
+    crows2 = run_query(countries_cypher, {"key": key})
+    node["countries"] = crows2[0]["countries"] if crows2 else []
+    node["species_count"] = crows2[0]["species_count"] if crows2 else 0
     return node
 
 
