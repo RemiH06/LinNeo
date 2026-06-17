@@ -291,3 +291,182 @@ def stats():
     """
     rows = run_query(cypher)
     return rows[0] if rows else {}
+
+
+# ============================================================
+# SHUI -- grafo principal, ejemplos por reino, filtros geograficos
+# ============================================================
+
+def list_kingdoms():
+    """Los reinos con su key, para el grafo y los ejemplos."""
+    cypher = """
+    MATCH (k:Kingdom)
+    RETURN k.kingdom_key AS key, coalesce(k.canonical_name, k.name) AS name
+    ORDER BY name
+    """
+    return run_query(cypher)
+
+
+def graph_default():
+    """
+    Grafo inicial de shui: nodo virtual 'Biota' -> reinos -> filos.
+    Cada nodo lleva su 'kingdom' para colorearse. Biota es virtual (key null).
+    """
+    nodes = [{"id": "biota", "name": "Biota", "rank": "root", "key": None, "kingdom": None}]
+    links = []
+    kingdoms = run_query("""
+        MATCH (k:Kingdom)
+        OPTIONAL MATCH (k)-[:HAS_CHILD]->(p:Phylum)
+        WITH k, p ORDER BY coalesce(p.canonical_name, p.name)
+        RETURN k.kingdom_key AS kkey, coalesce(k.canonical_name, k.name) AS kname,
+               collect(DISTINCT {key: p.phylum_key, name: coalesce(p.canonical_name, p.name)}) AS phyla
+    """)
+    for k in kingdoms:
+        kid = f"kingdom:{k['kkey']}"
+        nodes.append({"id": kid, "name": k["kname"], "rank": "kingdom",
+                      "key": k["kkey"], "kingdom": k["kname"]})
+        links.append({"source": "biota", "target": kid})
+        for p in k["phyla"]:
+            if not p.get("name"):
+                continue
+            pid = f"phylum:{p['key']}"
+            nodes.append({"id": pid, "name": p["name"], "rank": "phylum",
+                          "key": p["key"], "kingdom": k["kname"]})
+            links.append({"source": kid, "target": pid})
+    return {"nodes": nodes, "links": links, "center": "biota", "kingdom": None}
+
+
+def graph_focus(rank: str, key: int, depth: int = 1):
+    """
+    Grafo centrado en un nodo: el nodo + hasta `depth` niveles de descendientes.
+    Todos comparten reino (mismo color, distinta luminosidad por rango).
+    """
+    rank = rank.lower()
+    if rank not in RANK_LABEL:
+        return None
+    label, keyprop = RANK_LABEL[rank]
+
+    # reino del nodo (para tintar)
+    krow = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})
+        RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
+        LIMIT 1
+    """, {"key": key})
+    if not krow:
+        return None
+    center_name = krow[0]["name"]
+    kingdom = krow[0]["kingdom"]
+
+    # cadena de rangos hacia abajo desde `rank`
+    chain = []
+    r = rank
+    for _ in range(depth):
+        r = CHILD_RANK.get(r)
+        if not r:
+            break
+        chain.append(r)
+
+    center_id = f"{rank}:{key}"
+    nodes = [{"id": center_id, "name": center_name, "rank": rank, "key": key, "kingdom": kingdom}]
+    links = []
+    seen = {center_id}
+
+    # nivel 1
+    if chain:
+        lvl1_label, lvl1_keyprop = RANK_LABEL[chain[0]]
+        lvl1 = run_query(f"""
+            MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:{lvl1_label})
+            RETURN c.{lvl1_keyprop} AS key, coalesce(c.canonical_name, c.name, c.scientific_name) AS name
+            ORDER BY name LIMIT 60
+        """, {"key": key})
+        for c in lvl1:
+            if not c.get("name"):
+                continue
+            cid = f"{chain[0]}:{c['key']}"
+            if cid not in seen:
+                seen.add(cid)
+                nodes.append({"id": cid, "name": c["name"], "rank": chain[0], "key": c["key"], "kingdom": kingdom})
+            links.append({"source": center_id, "target": cid})
+        # nivel 2
+        if len(chain) > 1:
+            lvl2_label, lvl2_keyprop = RANK_LABEL[chain[1]]
+            lvl1_keys = [c["key"] for c in lvl1 if c.get("key") is not None]
+            if lvl1_keys:
+                lvl2 = run_query(f"""
+                    MATCH (p:{lvl1_label})-[:HAS_CHILD]->(c:{lvl2_label})
+                    WHERE p.{lvl1_keyprop} IN $pkeys
+                    RETURN p.{lvl1_keyprop} AS pkey, c.{lvl2_keyprop} AS key,
+                           coalesce(c.canonical_name, c.name, c.scientific_name) AS name
+                    ORDER BY name LIMIT 300
+                """, {"pkeys": lvl1_keys})
+                for c in lvl2:
+                    if not c.get("name"):
+                        continue
+                    pid = f"{chain[0]}:{c['pkey']}"
+                    cid = f"{chain[1]}:{c['key']}"
+                    if cid not in seen:
+                        seen.add(cid)
+                        nodes.append({"id": cid, "name": c["name"], "rank": chain[1], "key": c["key"], "kingdom": kingdom})
+                    links.append({"source": pid, "target": cid})
+
+    return {"nodes": nodes, "links": links, "center": center_id, "kingdom": kingdom}
+
+
+def random_by_kingdom(per_kingdom: int = 1):
+    """
+    Una especie aleatoria por reino, que tenga descripcion. Devuelve imagen si la hay.
+    Optimizado: en vez de recorrer HAS_CHILD* (carisimo), parte de las Species que
+    tienen descripcion, muestrea por reino usando s.kingdom (propiedad directa).
+    """
+    cypher = """
+    MATCH (k:Kingdom)
+    WITH coalesce(k.canonical_name, k.name) AS kingdom
+    CALL {
+        WITH kingdom
+        MATCH (s:Species)
+        WHERE s.kingdom = kingdom AND EXISTS { (s)-[:HAS_DESCRIPTION]->(:Description) }
+        WITH s, rand() AS r ORDER BY r LIMIT $n
+        OPTIONAL MATCH (s)-[m:HAS_MEDIA]->(md:Media) WHERE md.media_type = 'image'
+        WITH s, head(collect(md.url)) AS image
+        RETURN collect({
+            species_key: s.species_key,
+            name: coalesce(s.canonical_name, s.scientific_name),
+            kingdom: s.kingdom,
+            image: image
+        }) AS examples
+    }
+    RETURN kingdom, examples
+    """
+    return run_query(cypher, {"n": per_kingdom})
+
+
+def random_descendants(rank: str, key: int, n: int = 9):
+    """Especies aleatorias con descripcion, descendientes de un nodo (mismo reino)."""
+    rank = rank.lower()
+    if rank not in RANK_LABEL:
+        return []
+    label, keyprop = RANK_LABEL[rank]
+    cypher = f"""
+    MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+    WHERE EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }}
+    WITH s, rand() AS r ORDER BY r LIMIT $n
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(m:Media) WHERE m.media_type = 'image'
+    RETURN s.species_key AS species_key,
+           coalesce(s.canonical_name, s.scientific_name) AS name,
+           s.kingdom AS kingdom,
+           head(collect(m.url)) AS image
+    """
+    return run_query(cypher, {"key": key, "n": n})
+
+
+def list_continents():
+    cypher = "MATCH (c:Continent) RETURN c.name AS name ORDER BY name"
+    return [r["name"] for r in run_query(cypher)]
+
+
+def countries_in_continent(continent: str):
+    cypher = """
+    MATCH (c:Country)-[:PART_OF]->(k:Continent {name: $cont})
+    RETURN c.key AS key, c.name AS name ORDER BY name
+    """
+    return run_query(cypher, {"cont": continent})

@@ -38,8 +38,10 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
   if (relatives) {
     const famId = relatives.family?.name ? idOf('Family', relatives.family.name) : null
     const genId = relatives.genus?.name ? idOf('Genus', relatives.genus.name) : null
-    if (famId) {
-      // asegurar que el nodo familia tenga su key
+    // solo conectar si el nodo padre EXISTE en el grafo (la taxonomia puede estar incompleta)
+    const famExists = famId && nodes.some((x) => x.id === famId)
+    const genExists = genId && nodes.some((x) => x.id === genId)
+    if (famExists) {
       const fam = nodes.find((x) => x.id === famId)
       if (fam) { fam.key = relatives.family.key; fam.taxonRank = 'family' }
       for (const g of (relatives.sibling_genera || [])) {
@@ -47,7 +49,7 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
         links.push({ source: famId, target: gid })
       }
     }
-    if (genId) {
+    if (genExists) {
       const gen = nodes.find((x) => x.id === genId)
       if (gen) { gen.key = relatives.genus.key; gen.taxonRank = 'genus' }
       for (const sp of (relatives.sibling_species || [])) {
@@ -56,7 +58,10 @@ function buildGraph(lineage, relatives, currentName, currentKey) {
       }
     }
   }
-  return { nodes, links }
+  // red de seguridad: descartar cualquier link cuyo extremo no exista como nodo
+  const nodeIds = new Set(nodes.map((n) => n.id))
+  const safeLinks = links.filter((l) => nodeIds.has(l.source) && nodeIds.has(l.target))
+  return { nodes, links: safeLinks }
 }
 
 export default function TaxonomyGraph({ lineage = [], relatives, currentName, currentKey, kingdom }) {

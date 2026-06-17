@@ -1,0 +1,248 @@
+import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
+import ShuiGraph from '../components/ShuiGraph'
+import ShuiBackground from '../backgrounds/ShuiBackground'
+import { useTheme } from '../theme/ThemeContext'
+import { useSetKingdom } from '../theme/KingdomContext'
+import { KINGDOM_HUE } from '../theme/kingdomColor'
+import ThemeToggle from '../components/ThemeToggle'
+import '../theme/shui.css'
+
+function glowFor(kingdom, dark) {
+  const h = KINGDOM_HUE[kingdom]
+  const gray = (kingdom === 'incertae sedis' || h == null)
+  const hue = gray ? 210 : h
+  const sat = gray ? 12 : (dark ? 80 : 65)
+  return `hsl(${hue}, ${sat}%, ${dark ? 55 : 48}%)`
+}
+function swatchFor(kingdom, dark) {
+  const h = KINGDOM_HUE[kingdom]
+  const gray = (kingdom === 'incertae sedis' || h == null)
+  return `hsl(${gray ? 210 : h}, ${gray ? 12 : 80}%, ${dark ? 55 : 45}%)`
+}
+
+// Reinos activos por defecto (el resto arranca desmarcado)
+const DEFAULT_KINGDOMS = ['Animalia', 'Plantae', 'Fungi']
+
+export default function Shui() {
+  const navigate = useNavigate()
+  const { dark } = useTheme()
+
+  const [graphData, setGraphData] = useState(null)
+  const [focusKingdom, setFocusKingdom] = useState(null)
+  const [focusNode, setFocusNode] = useState(null)
+
+  // reinos y cuales estan activos (checkboxes izquierda)
+  const [kingdoms, setKingdoms] = useState([])
+  const [activeKingdoms, setActiveKingdoms] = useState(new Set())
+
+  // buscador
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState([])
+  const searchTimer = useRef(null)
+
+  // filtros geograficos (barra derecha)
+  const [continents, setContinents] = useState([])
+  const [countries, setCountries] = useState([])
+  const [continent, setContinent] = useState('')
+  const [country, setCountry] = useState('')
+
+  // barra inferior
+  const [examples, setExamples] = useState([])
+  const [exLoading, setExLoading] = useState(true)
+  const [exError, setExError] = useState(false)
+
+  useSetKingdom(focusKingdom)
+
+  useEffect(() => {
+    api.graph().then((g) => { setGraphData(g); setFullGraph(g) }).catch(() => {})
+    api.continents().then(setContinents).catch(() => {})
+    api.kingdoms().then((ks) => {
+      setKingdoms(ks)
+      const names = ks.map((k) => k.name)
+      setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
+    }).catch(() => {})
+    loadKingdomExamples()
+  }, [])
+
+  // guardamos el grafo completo para filtrar por reino sin re-pedir
+  const fullGraphRef = useRef(null)
+  const setFullGraph = (g) => { fullGraphRef.current = g }
+
+  // recalcular grafo visible al cambiar checkboxes (solo en vista Biota)
+  useEffect(() => {
+    if (focusNode || !fullGraphRef.current) return
+    const full = fullGraphRef.current
+    const keepKingdomNames = activeKingdoms
+    // nodos: biota + reinos activos + filos de reinos activos
+    const nodes = full.nodes.filter((n) => {
+      if (n.rank === 'root') return true
+      return keepKingdomNames.has(n.kingdom)
+    })
+    const ids = new Set(nodes.map((n) => n.id))
+    const links = full.links.filter((l) => ids.has(l.source) && ids.has(l.target))
+    setGraphData({ ...full, nodes, links })
+  }, [activeKingdoms, focusNode])
+
+  function loadKingdomExamples() {
+    setExLoading(true); setExError(false)
+    api.randomKingdoms().then((rows) => {
+      const ex = rows.map((r) => r.examples?.[0]).filter(Boolean)
+      setExamples(ex); setExLoading(false)
+    }).catch(() => { setExError(true); setExLoading(false) })
+  }
+
+  function focusOn(node) {
+    if (!node) {
+      setGraphData(fullGraphRef.current)
+      setFocusKingdom(null); setFocusNode(null)
+      loadKingdomExamples()
+      return
+    }
+    api.graphFocus(node.rank, node.key).then((g) => {
+      setGraphData(g)
+      setFocusKingdom(g.kingdom || null)
+      setFocusNode(node)
+      setExLoading(true); setExError(false)
+      api.randomDescendants(node.rank, node.key, 9)
+        .then((rows) => { setExamples(rows || []); setExLoading(false) })
+        .catch(() => { setExError(true); setExLoading(false) })
+    }).catch(() => {})
+  }
+
+  function toggleKingdom(name) {
+    setActiveKingdoms((prev) => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
+
+  function onSearch(value) {
+    setQ(value)
+    clearTimeout(searchTimer.current)
+    if (!value.trim()) { setResults([]); return }
+    searchTimer.current = setTimeout(() => {
+      api.search(value.trim(), 15).then((rows) => setResults(rows || [])).catch(() => setResults([]))
+    }, 250)
+  }
+
+  function onContinent(value) {
+    setContinent(value); setCountry(''); setCountries([])
+    if (value) api.countries(value).then(setCountries).catch(() => setCountries([]))
+  }
+  function applyCountryFilter() {
+    if (!country) return
+    api.filter({ country }).then((res) => setResults(res.results || [])).catch(() => setResults([]))
+  }
+
+  function resetAll() {
+    setQ(''); setResults([]); setContinent(''); setCountry(''); setCountries([])
+    const names = kingdoms.map((k) => k.name)
+    setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
+    focusOn(null)
+  }
+
+  return (
+    <div className="shui-scope">
+      <ShuiBackground />
+      {/* luz del reino al hacer focus */}
+      <div className="sh-kingdom-glow" style={{
+        background: focusKingdom
+          ? `radial-gradient(circle at 50% 100%, ${glowFor(focusKingdom, dark)}55 0%, transparent 65%)`
+          : 'transparent',
+      }} />
+
+      <div className="sh-page">
+        <div className="sh-top">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="sh-title">LinNeo<span>_</span></div>
+            <ThemeToggle />
+          </div>
+          {/* Buscador */}
+          <div className="sh-searchbar">
+            <input className="sh-input" value={q} onChange={(e) => onSearch(e.target.value)}
+              placeholder="Buscar por nombre comun o cientifico..." />
+            <button className="sh-kbtn" onClick={resetAll}>Reiniciar</button>
+          </div>
+          {results.length > 0 && (
+            <div className="sh-results">
+              {results.map((r) => (
+                <div key={r.species_key} className="sh-result" onClick={() => navigate(`/species/${r.species_key}`)}>
+                  <span className="sci">{r.canonical_name || r.scientific_name}</span>
+                  {r.common_names?.length > 0 && <span className="common"> - {r.common_names.slice(0, 3).join(', ')}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Cuerpo: barra izquierda + grafo + barra derecha */}
+        <div className="sh-body">
+          {/* Izquierda: reinos */}
+          <aside className="sh-side">
+            <h3>Reinos</h3>
+            {kingdoms.map((k) => (
+              <label key={k.key} className="sh-check">
+                <input type="checkbox" checked={activeKingdoms.has(k.name)} onChange={() => toggleKingdom(k.name)} disabled={!!focusNode} />
+                <span className="sh-swatch" style={{ background: swatchFor(k.name, dark) }} />
+                {k.name}
+              </label>
+            ))}
+            {focusNode && <p style={{ fontSize: 10, color: 'var(--sh-text2)', marginTop: 10 }}>Reinicia el grafo para filtrar por reino.</p>}
+          </aside>
+
+          {/* Centro: grafo */}
+          <div className="sh-center-col">
+            <div className="sh-graph-wrap">
+              {graphData && <ShuiGraph data={graphData} onFocus={focusOn} onOpenSpecies={(k) => navigate(`/species/${k}`)} />}
+            </div>
+          </div>
+
+          {/* Derecha: geografia */}
+          <aside className="sh-side right">
+            <h3>Geografia</h3>
+            <label className="sh-fieldlabel">Continente</label>
+            <select className="sh-select" style={{ width: '100%' }} value={continent} onChange={(e) => onContinent(e.target.value)}>
+              <option value="">Todos</option>
+              {continents.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <label className="sh-fieldlabel">Pais</label>
+            <select className="sh-select" style={{ width: '100%' }} value={country} onChange={(e) => setCountry(e.target.value)} disabled={!continent}>
+              <option value="">Todos</option>
+              {countries.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+            </select>
+            <button className="sh-kbtn" style={{ width: '100%', marginTop: 10 }} onClick={applyCountryFilter} disabled={!country}>Filtrar especies</button>
+          </aside>
+        </div>
+
+        {/* Acciones */}
+        <div className="sh-kbar-actions">
+          <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
+        </div>
+
+        {/* Barra inferior de ejemplos */}
+        <div className="sh-kbar">
+          {exLoading && Array.from({ length: 9 }).map((_, i) => (
+            <div key={`ph${i}`} className="sh-kbox" style={{ opacity: .5 }}><span className="label">cargando...</span></div>
+          ))}
+          {!exLoading && exError && (
+            <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">No se pudieron cargar ejemplos.</span></div>
+          )}
+          {!exLoading && !exError && examples.length === 0 && (
+            <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
+          )}
+          {!exLoading && !exError && examples.map((ex, i) => (
+            <div key={ex.species_key || i} className="sh-kbox"
+              style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
+              onClick={() => navigate(`/species/${ex.species_key}`)} title={ex.name}>
+              {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
+              <span className="label">{ex.name}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}

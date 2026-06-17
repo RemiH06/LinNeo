@@ -21,6 +21,14 @@ export const api = {
     ).toString()
     return get(`/filter?${qs}`)
   },
+  // shui
+  kingdoms: () => get('/kingdoms'),
+  graph: () => get('/graph'),
+  graphFocus: (rank, key) => get(`/graph/${rank}/${key}`),
+  randomKingdoms: () => get('/random/kingdoms'),
+  randomDescendants: (rank, key, n = 9) => get(`/random/${rank}/${key}?n=${n}`),
+  continents: () => get('/continents'),
+  countries: (continent) => get(`/continents/${encodeURIComponent(continent)}/countries`),
 }
 
 // Paleta y etiquetas de los tipos de presencia (establishment_means)

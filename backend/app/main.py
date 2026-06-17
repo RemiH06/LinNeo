@@ -98,6 +98,50 @@ def taxon_node(rank: str, key: int):
         raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
     return node
 
+
+# ── SHUI: grafo principal, ejemplos por reino, geografia ──
+
+@app.get("/kingdoms")
+def kingdoms():
+    return queries.list_kingdoms()
+
+
+@app.get("/graph")
+def graph():
+    """Grafo inicial: Biota -> reinos -> filos."""
+    return queries.graph_default()
+
+
+@app.get("/graph/{rank}/{key}")
+def graph_focus(rank: str, key: int):
+    """Grafo centrado en un nodo + 2 niveles de descendientes."""
+    g = queries.graph_focus(rank, key)
+    if g is None:
+        raise HTTPException(status_code=404, detail="Nodo no encontrado")
+    return g
+
+
+@app.get("/random/kingdoms")
+def random_kingdoms():
+    """Una especie aleatoria con descripcion por cada reino."""
+    return queries.random_by_kingdom(1)
+
+
+@app.get("/random/{rank}/{key}")
+def random_descendants(rank: str, key: int, n: int = Query(9, ge=1, le=20)):
+    """Especies aleatorias con descripcion descendientes de un nodo."""
+    return queries.random_descendants(rank, key, n)
+
+
+@app.get("/continents")
+def continents():
+    return queries.list_continents()
+
+
+@app.get("/continents/{continent}/countries")
+def continent_countries(continent: str):
+    return queries.countries_in_continent(continent)
+
 #? No sé qué le pasó al main pero ya no muestra las cosas como deberían estar.
 #! El color en los nodos del grafo taxonómico desapareció, corrígelo
 #* Fue un día productivo, por favor vete a dormir.

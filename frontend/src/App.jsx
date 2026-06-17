@@ -7,6 +7,7 @@ import KingdomBackdrop from './backgrounds/KingdomBackdrop'
 import ThemeToggle from './components/ThemeToggle'
 import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
+import Shui from './pages/Shui'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Callout } from './components/ui'
 
@@ -78,7 +79,7 @@ export default function App() {
         <ElixirGraph />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<div className="page"><Home /></div>} />
+            <Route path="/" element={<ErrorBoundary><Shui /></ErrorBoundary>} />
             <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />
             <Route path="/taxon/:rank/:key" element={<ErrorBoundary><TaxonPage /></ErrorBoundary>} />
           </Routes>

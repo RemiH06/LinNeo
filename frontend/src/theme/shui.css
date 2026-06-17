@@ -1,0 +1,101 @@
+/* ============================================================
+   LinNeo -- Tema shui (pagina principal / shell)
+   Oceanico turquesa. Se activa envolviendo en .shui-scope
+============================================================ */
+.shui-scope {
+  --sh-bg:#0A2A3A; --sh-bg2:#0E3448; --sh-bg3:#123E58; --sh-text:#E8F8F8; --sh-text2:#88C8D8;
+  --sh-border:#1E5068; --sh-deep:#062030; --sh-surface:#1878A0; --sh-foam:#C8F0F8;
+  --sh-accent:#20D0C0; --sh-accent2:#40E0E0; --sh-ray:#A0E8F8; --sh-coral:#F08050; --sh-sand:#E0C878;
+  --sh-mono:'Iosevka', ui-monospace, monospace; --sh-radius:3px;
+  /* sobreescribe las variables base para que TODO (incluidos componentes compartidos) use el tema shui */
+  --bg:#0A2A3A; --bg2:#0E3448; --bg3:#123E58; --text:#E8F8F8; --text2:#88C8D8;
+  --border:#1E5068; --accent:#20D0C0; --accent2:#40E0E0; --radius:3px;
+  --mono:'Recursive', ui-monospace, monospace;
+  background: var(--sh-bg);
+  color: var(--sh-text);
+  font-family: 'Iosevka', ui-monospace, monospace;
+  position: relative;
+  z-index: 5;
+  height: 100vh;
+  overflow: hidden;
+}
+body.dark .shui-scope {
+  --sh-bg:#020608; --sh-bg2:#040C10; --sh-bg3:#081018; --sh-text:#C0E8F0; --sh-text2:#406878;
+  --sh-border:#0C2030; --sh-deep:#010408; --sh-surface:#041020; --sh-foam:#203848;
+  --bg:#020608; --bg2:#040C10; --bg3:#081018; --text:#C0E8F0; --text2:#406878; --border:#0C2030;
+}
+.shui-scope .sh-kingdom-glow { position: absolute; inset: 0; z-index: 0; pointer-events: none; transition: background 0.6s ease; }
+.shui-scope .sh-page { position: relative; z-index: 2; height: 100vh; display: flex; flex-direction: column; }
+.shui-scope .sh-top { padding: 20px 28px 12px; flex-shrink: 0; }
+.shui-scope .sh-title { font-size: 24px; font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.shui-scope .sh-title span { color: var(--sh-accent); }
+
+/* buscador */
+.shui-scope .sh-searchbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.shui-scope .sh-input {
+  flex: 1; min-width: 200px; font-family: var(--sh-mono); font-size: 14px; padding: 10px 14px;
+  background: var(--sh-bg2); border: 1px solid var(--sh-border); border-radius: var(--sh-radius); color: var(--sh-text);
+}
+.shui-scope .sh-input:focus { outline: none; border-color: var(--sh-accent); }
+.shui-scope .sh-select {
+  font-family: var(--sh-mono); font-size: 12px; padding: 10px 12px; background: var(--sh-bg2);
+  border: 1px solid var(--sh-border); border-radius: var(--sh-radius); color: var(--sh-text); cursor: pointer;
+}
+.shui-scope .sh-select:disabled { opacity: .45; cursor: not-allowed; }
+
+/* resultados de busqueda (dropdown) */
+.shui-scope .sh-results { background: var(--sh-bg2); border: 1px solid var(--sh-border); border-radius: var(--sh-radius); margin-top: 6px; max-height: 320px; overflow-y: auto; }
+.shui-scope .sh-result { padding: 8px 14px; cursor: pointer; border-bottom: 1px solid var(--sh-border); }
+.shui-scope .sh-result:hover { background: var(--sh-bg3); }
+.shui-scope .sh-result .sci { font-style: italic; }
+.shui-scope .sh-result .common { color: var(--sh-text2); font-size: 12px; }
+
+/* grafo central */
+.shui-scope .sh-graph-wrap { flex: 1; position: relative; min-height: 200px; }
+
+/* barra inferior de ejemplos */
+.shui-scope .sh-kbar { display: flex; gap: 10px; padding: 85px 20px 20px; overflow-x: auto; overflow-y: visible; flex-shrink: 0; }
+.shui-scope .sh-kbar-actions { display: flex; gap: 8px; padding: 0 20px 10px; flex-shrink: 0; }
+.shui-scope .sh-kbox {
+  position: relative; flex: 1; min-width: 120px; height: 110px; border-radius: 10px;
+  cursor: pointer; border: 1px solid var(--sh-border); background: var(--sh-bg2);
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  transition: border-color .2s, box-shadow .2s;
+}
+.shui-scope .sh-kbox:hover {
+  border-color: var(--kbox-glow, var(--sh-accent));
+  box-shadow: 0 0 0 1px var(--kbox-glow, var(--sh-accent));
+}
+.shui-scope .sh-kbox img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; z-index: 1; border-radius: 10px; }
+.shui-scope .sh-kbox .label {
+  position: relative; z-index: 3; font-size: 12px; padding: 6px 8px; font-style: italic;
+  text-shadow: 0 1px 6px rgba(0,0,0,.9); color: #fff;
+}
+/* luz hacia arriba DETRAS de la caja, ancha, grande y desbordante (flama) */
+.shui-scope .sh-kbox::before {
+  content: ''; position: absolute; left: -15%; right: -15%; bottom: 0; top: -180%;
+  background: radial-gradient(ellipse 55% 62% at 50% 92%, var(--kbox-glow, var(--sh-accent)) 0%, var(--kbox-glow, var(--sh-accent)) 14%, transparent 74%);
+  opacity: .95; z-index: 0; pointer-events: none; filter: blur(12px);
+}
+/* segundo halo mas alto, refuerza la flama ascendente */
+.shui-scope .sh-kbox::after {
+  content: ''; position: absolute; left: 8%; right: 8%; bottom: 8%; top: -230%;
+  background: radial-gradient(ellipse 50% 55% at 50% 100%, var(--kbox-glow, var(--sh-accent)) 0%, transparent 68%);
+  opacity: .6; z-index: 0; pointer-events: none; filter: blur(16px);
+}
+.shui-scope .sh-kbtn {
+  font-family: var(--sh-mono); font-size: 11px; padding: 6px 14px; border: 1px solid var(--sh-border);
+  border-radius: var(--sh-radius); background: var(--sh-bg2); color: var(--sh-text2); cursor: pointer;
+}
+.shui-scope .sh-kbtn:hover { border-color: var(--sh-accent); color: var(--sh-accent); }
+
+/* ── Layout con barras laterales ── */
+.shui-scope .sh-body { flex: 1; display: flex; min-height: 0; }
+.shui-scope .sh-side { width: 180px; flex-shrink: 0; padding: 16px 14px; overflow-y: auto; background: rgba(0,0,0,0.12); border-right: 1px solid var(--sh-border); }
+.shui-scope .sh-side.right { border-right: none; border-left: 1px solid var(--sh-border); }
+.shui-scope .sh-side h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--sh-accent); margin-bottom: 12px; }
+.shui-scope .sh-check { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; cursor: pointer; }
+.shui-scope .sh-check input { accent-color: var(--sh-accent); cursor: pointer; }
+.shui-scope .sh-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.shui-scope .sh-center-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.shui-scope .sh-side label.sh-fieldlabel { display: block; font-size: 10px; color: var(--sh-text2); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .08em; }
