@@ -79,6 +79,51 @@ def cmd_find(path, args):
         if not found:
             print(f"Sin coincidencias para '{needle}'")
 
+def cmd_byid(path, args):
+    """Busca filas cuyo taxonID sea EXACTAMENTE el valor dado (sin substring)."""
+    target = args[0] if args else ''
+    h = get_header(path)
+    ti = h.index('taxonID') if 'taxonID' in h else None
+    if ti is None:
+        print("No hay columna taxonID")
+        return
+    with open(path, encoding='utf-8') as f:
+        reader = csv.reader(f, delimiter='\t')
+        next(reader, None)
+        for parts in reader:
+            if ti < len(parts) and parts[ti] == target:
+                print(f"\n=== taxonID {target} encontrado ===")
+                for i, c in enumerate(h):
+                    val = parts[i] if i < len(parts) else ''
+                    if val:
+                        print(f"  {c}: {val}")
+                return
+    print(f"taxonID {target} NO existe en el TSV")
+
+def cmd_byname(path, args):
+    """Busca filas cuyo canonicalName/scientificName sea EXACTAMENTE el valor dado."""
+    target = (args[0] if args else '').strip()
+    h = get_header(path)
+    name_cols = [(c, h.index(c)) for c in ('canonicalName', 'scientificName') if c in h]
+    found = 0
+    with open(path, encoding='utf-8') as f:
+        reader = csv.reader(f, delimiter='\t')
+        next(reader, None)
+        for parts in reader:
+            if any(i < len(parts) and parts[i] == target for _, i in name_cols):
+                print(f"\n=== Coincidencia exacta {found+1} ===")
+                for i, c in enumerate(h):
+                    val = parts[i] if i < len(parts) else ''
+                    if val:
+                        print(f"  {c}: {val}")
+                found += 1
+                if found >= 8:
+                    break
+    if not found:
+        print(f"Ningun taxon con nombre exacto '{target}'")
+    else:
+        print(f"\nTotal coincidencias exactas mostradas: {found}")
+
 def cmd_fungi(path, args):
     n = int(args[0]) if args else 3
     h = get_header(path)
@@ -144,6 +189,7 @@ def cmd_ranks_fungi(path, _):
 
 CMDS = {
     'header': cmd_header, 'sample': cmd_sample, 'find': cmd_find,
+    'byid': cmd_byid, 'byname': cmd_byname,
     'fungi': cmd_fungi, 'keycols': cmd_keycols, 'ranks-fungi': cmd_ranks_fungi,
 }
 

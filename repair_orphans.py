@@ -90,6 +90,7 @@ def main():
     orphan_id = {}        # gbifid(int) -> (graphkey, name, rank) para family/genus/species
     orphan_name = {}      # (name, rank) -> graphkey                para order/class/phylum
     name_keys = set()
+    orphan_names_set = set()   # (name,rank) de TODOS los huerfanos (para fallback por nombre)
     species_gbifids = set()
     n_orphans = 0
     discarded = 0
@@ -103,6 +104,8 @@ def main():
                 discarded += 1
                 continue
             n_orphans += 1
+            if name:
+                orphan_names_set.add((name, rank))
             if rank in ID_RANKS:
                 gbid = to_int(gk)
                 if gbid is None:
@@ -150,20 +153,11 @@ def main():
             cname = get(parts, idx, 'canonicalName')
             sname = get(parts, idx, 'scientificName')
             tid_name[tid] = cname or sname
-            if rank in CHILD_NAME_RANKS and name_keys:
-                for nm in {cname, sname}:
-                    if nm and (nm, rank) in name_keys:
-                        name_to_tids[(nm, rank)].add(tid)
-
-    # resolver gbifid de huerfanos por nombre (order/class) si es unico
-    name_resolved = {}
-    name_ambiguous = []
-    for k in name_keys:
-        tids = name_to_tids.get(k, set())
-        if len(tids) == 1:
-            name_resolved[k] = next(iter(tids))
-        else:
-            name_ambiguous.append((k, len(tids)))
+            if orphan_names_set:
+                if (cname, rank) in orphan_names_set:
+                    name_to_tids[(cname, rank)].add(tid)
+                elif (sname, rank) in orphan_names_set:
+                    name_to_tids[(sname, rank)].add(tid)
 
     # ---- Subir la cadena hasta el primer ancestro de rango principal ----
     def effective_parent(start_pid):
@@ -178,6 +172,7 @@ def main():
 
     links = []
     unresolved = []
+    rescued_by_name = 0
 
     def emit(gk, cname, crank, start_pid):
         if not start_pid:
@@ -195,28 +190,48 @@ def main():
             return
         links.append((gk, cname, crank, pe, pname, prank))
 
-    # family/genus/species huerfanos (por id)
+    def start_by_name(name, rank):
+        """Fallback: localizar el taxon por nombre+rango en el TSV (unico) y
+        devolver su parentID. Devuelve (start, motivo_error)."""
+        tids = name_to_tids.get((name, rank), set())
+        if len(tids) == 1:
+            return tid_parent.get(next(iter(tids))), None
+        if len(tids) > 1:
+            return None, 'nombre ambiguo en TSV'
+        return None, None  # no hallado por nombre
+
+    # family/genus/species huerfanos (por id; con fallback por nombre)
     for gbid, (gk, name, rank) in orphan_id.items():
         if rank == 'species':
             start = orphan_species_parent.get(gbid)
             if start is None:
                 unresolved.append((gk, name, rank, '', 'species no hallada en TSV'))
                 continue
-        else:
-            if gbid not in tid_parent:
-                unresolved.append((gk, name, rank, '', f'{rank} no hallado en TSV'))
-                continue
+        elif gbid in tid_parent:
             start = tid_parent[gbid]
+        else:
+            # la key del grafo no esta en el backbone -> intentar por nombre
+            start, err = start_by_name(name, rank)
+            if start is None:
+                if err:
+                    unresolved.append((gk, name, rank, '', err))
+                else:
+                    unresolved.append((gk, name, rank, '',
+                                       f'{rank} no hallado (ni por id ni por nombre)'))
+                continue
+            rescued_by_name += 1
         emit(gk, name, rank, start)
 
     # order/class/phylum huerfanos (por nombre)
     for k, gk in orphan_name.items():
         name, rank = k
-        if k in name_resolved:
-            start = tid_parent.get(name_resolved[k])
-            emit(gk, name, rank, start)
+        start, err = start_by_name(name, rank)
+        if start is None and err is None and k in name_keys:
+            unresolved.append((gk, name, rank, '', 'nombre no hallado en TSV'))
+        elif err:
+            unresolved.append((gk, name, rank, '', err))
         else:
-            unresolved.append((gk, name, rank, '', 'nombre ambiguo o no hallado en TSV'))
+            emit(gk, name, rank, start)
 
     # ---- Escribir orphan_links.csv ----
     links_path = os.path.join(args.out, 'orphan_links.csv')
@@ -241,8 +256,8 @@ def main():
             mot[row[4]] += 1
         for m, n in sorted(mot.items(), key=lambda x: -x[1]):
             print(f"    {n:,}  {m}")
-    if name_ambiguous:
-        print(f"AVISO: {len(name_ambiguous)} nombres order/class/phylum ambiguos en el TSV")
+    if rescued_by_name:
+        print(f"Rescatados por nombre (key no estaba en el TSV): {rescued_by_name:,}")
 
     # ---- Generar repair_orphans.cypher ----
     combos = sorted({(c[2], c[5]) for c in links},
@@ -279,7 +294,8 @@ def main():
             else:
                 w(f"MATCH (p:{plbl} {{name: row.parent_name}})\n")
                 w("WITH c, collect(DISTINCT p) AS ps WHERE size(ps) = 1\n")
-                w("MERGE (ps[0])-[:HAS_CHILD]->(c);\n\n")
+                w("WITH c, ps[0] AS p\n")
+                w("MERGE (p)-[:HAS_CHILD]->(c);\n\n")
         w("// Verificacion: huerfanos restantes por rango.\n")
         w("MATCH (n) WHERE (n:Phylum OR n:Class OR n:Order OR n:Family OR n:Genus "
           "OR n:Species) AND NOT ()-[:HAS_CHILD]->(n)\n")
