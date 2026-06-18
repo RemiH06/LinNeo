@@ -26,9 +26,14 @@ body.dark .shui-scope {
 }
 .shui-scope .sh-kingdom-glow { position: absolute; inset: 0; z-index: 0; pointer-events: none; transition: background 0.6s ease; }
 .shui-scope .sh-page { position: relative; z-index: 2; height: 100vh; display: flex; flex-direction: column; }
-.shui-scope .sh-top { padding: 20px 28px 12px; flex-shrink: 0; }
-.shui-scope .sh-title { font-size: 24px; font-weight: 700; letter-spacing: -1px; margin-bottom: 14px; }
+.shui-scope .sh-top { padding: 16px 28px 12px; flex-shrink: 0; }
+.shui-scope .sh-title { font-size: 24px; font-weight: 700; letter-spacing: -1px; flex-shrink: 0; white-space: nowrap; }
 .shui-scope .sh-title span { color: var(--sh-accent); }
+
+/* barra superior: titulo + buscador + reiniciar + toggle, todo en una fila */
+.shui-scope .sh-topbar { display: flex; align-items: center; gap: 16px; }
+.shui-scope .sh-topbar .sh-searchbar { flex: 1; }
+.shui-scope .sh-topbar .theme-btn { flex-shrink: 0; }
 
 /* buscador */
 .shui-scope .sh-searchbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -53,9 +58,40 @@ body.dark .shui-scope {
 /* grafo central */
 .shui-scope .sh-graph-wrap { flex: 1; position: relative; min-height: 200px; }
 
-/* barra inferior de ejemplos */
-.shui-scope .sh-kbar { display: flex; gap: 10px; padding: 85px 20px 20px; overflow-x: auto; overflow-y: visible; flex-shrink: 0; }
-.shui-scope .sh-kbar-actions { display: flex; gap: 8px; padding: 0 20px 10px; flex-shrink: 0; }
+/* zona sensible en el borde inferior: invisible, solo detecta el hover para abrir el cajon */
+.shui-scope .sh-kbar-trigger {
+  flex-shrink: 0; height: 14px; position: relative; z-index: 6;
+}
+
+/* cajon deslizable de ejemplos: en flujo (empuja el grafo al abrir), altura animada.
+   overflow visible para que las flamas de sh-kbox asomen por encima del borde cuando esta cerrado;
+   el resto de cada caja (imagen, fondo, texto) se desvanece cuando esta cerrado. */
+.shui-scope .sh-kbar-drawer {
+  flex-shrink: 0; overflow: visible; position: relative; z-index: 6;
+  height: 26px; transition: height .32s ease;
+}
+.shui-scope .sh-kbar-drawer.open { height: 200px; }
+.shui-scope .sh-kbar-drawer::before {
+  content: '';
+  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  background: var(--sh-bg2);
+  border-top: 1px solid var(--sh-border);
+  z-index: -1;
+  opacity: 0; transition: opacity .32s ease;
+}
+.shui-scope .sh-kbar-drawer.open::before { opacity: 1; }
+.shui-scope .sh-kbar-drawer-inner {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+}
+/* cerrado: oculta cuerpo de las cajas (fondo, borde, imagen, texto) pero deja vivas las flamas */
+.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox { background: transparent; border-color: transparent; }
+.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox img,
+.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox .label { opacity: 0; transition: opacity .2s ease; }
+.shui-scope .sh-kbar-drawer:not(.open) .sh-kbar-actions { opacity: 0; pointer-events: none; }
+
+.shui-scope .sh-kbar { position: relative; display: flex; gap: 10px; padding: 0 20px 10px; overflow-x: auto; overflow-y: visible; flex-shrink: 0; }
+.shui-scope .sh-kbar-actions { display: flex; gap: 8px; padding: 0 20px 14px; flex-shrink: 0; transition: opacity .2s ease; }
 .shui-scope .sh-kbox {
   position: relative; flex: 1; min-width: 120px; height: 110px; border-radius: 10px;
   cursor: pointer; border: 1px solid var(--sh-border); background: var(--sh-bg2);

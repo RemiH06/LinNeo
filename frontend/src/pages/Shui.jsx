@@ -48,10 +48,21 @@ export default function Shui() {
   const [continent, setContinent] = useState('')
   const [country, setCountry] = useState('')
 
-  // barra inferior
+  // barra inferior (cajon deslizable)
   const [examples, setExamples] = useState([])
   const [exLoading, setExLoading] = useState(true)
   const [exError, setExError] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const drawerCloseTimer = useRef(null)
+
+  function openDrawer() {
+    clearTimeout(drawerCloseTimer.current)
+    setDrawerOpen(true)
+  }
+  function scheduleCloseDrawer() {
+    clearTimeout(drawerCloseTimer.current)
+    drawerCloseTimer.current = setTimeout(() => setDrawerOpen(false), 250)
+  }
 
   useSetKingdom(focusKingdom)
 
@@ -156,15 +167,14 @@ export default function Shui() {
 
       <div className="sh-page">
         <div className="sh-top">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="sh-topbar">
             <div className="sh-title">LinNeo<span>_</span></div>
-            <ThemeToggle />
-          </div>
-          {/* Buscador */}
-          <div className="sh-searchbar">
-            <input className="sh-input" value={q} onChange={(e) => onSearch(e.target.value)}
-              placeholder="Buscar por nombre comun o cientifico..." />
+            <div className="sh-searchbar">
+              <input className="sh-input" value={q} onChange={(e) => onSearch(e.target.value)}
+                placeholder="Buscar por nombre comun o cientifico..." />
+            </div>
             <button className="sh-kbtn" onClick={resetAll}>Reiniciar</button>
+            <ThemeToggle />
           </div>
           {results.length > 0 && (
             <div className="sh-results">
@@ -217,30 +227,39 @@ export default function Shui() {
           </aside>
         </div>
 
-        {/* Acciones */}
-        <div className="sh-kbar-actions">
-          <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
-        </div>
+        {/* Zona sensible al borde inferior: abre el cajon al pasar el mouse */}
+        <div className="sh-kbar-trigger" onMouseEnter={openDrawer} onMouseLeave={scheduleCloseDrawer} />
 
-        {/* Barra inferior de ejemplos */}
-        <div className="sh-kbar">
-          {exLoading && Array.from({ length: 9 }).map((_, i) => (
-            <div key={`ph${i}`} className="sh-kbox" style={{ opacity: .5 }}><span className="label">cargando...</span></div>
-          ))}
-          {!exLoading && exError && (
-            <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">No se pudieron cargar ejemplos.</span></div>
-          )}
-          {!exLoading && !exError && examples.length === 0 && (
-            <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
-          )}
-          {!exLoading && !exError && examples.map((ex, i) => (
-            <div key={ex.species_key || i} className="sh-kbox"
-              style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
-              onClick={() => navigate(`/species/${ex.species_key}`)} title={ex.name}>
-              {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
-              <span className="label">{ex.name}</span>
+        {/* Cajon deslizable de ejemplos */}
+        <div
+          className={`sh-kbar-drawer ${drawerOpen ? 'open' : ''}`}
+          onMouseEnter={openDrawer}
+          onMouseLeave={scheduleCloseDrawer}
+        >
+          <div className="sh-kbar-drawer-inner">
+            <div className="sh-kbar">
+              {exLoading && Array.from({ length: 9 }).map((_, i) => (
+                <div key={`ph${i}`} className="sh-kbox" style={{ opacity: .5 }}><span className="label">cargando...</span></div>
+              ))}
+              {!exLoading && exError && (
+                <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">No se pudieron cargar ejemplos.</span></div>
+              )}
+              {!exLoading && !exError && examples.length === 0 && (
+                <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
+              )}
+              {!exLoading && !exError && examples.map((ex, i) => (
+                <div key={ex.species_key || i} className="sh-kbox"
+                  style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
+                  onClick={() => navigate(`/species/${ex.species_key}`)} title={ex.name}>
+                  {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
+                  <span className="label">{ex.name}</span>
+                </div>
+              ))}
             </div>
-          ))}
+            <div className="sh-kbar-actions">
+              <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
