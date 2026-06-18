@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ThemeProvider } from './theme/ThemeContext'
 import { KingdomProvider } from './theme/KingdomContext'
 import ElixirGraph from './backgrounds/ElixirGraph'
+import BookwormBackground from './backgrounds/BookwormBackground'
 import KingdomBackdrop from './backgrounds/KingdomBackdrop'
 import ThemeToggle from './components/ThemeToggle'
 import SpeciesDetail from './pages/SpeciesDetail'
@@ -71,13 +72,21 @@ function SpeciesPage() {
   )
 }
 
+// Elige el fondo global segun la ruta: TaxonNode usa el fondo bookworm
+// (papel/herbario); el resto sigue usando el grafo neural elixir.
+function GlobalBackground() {
+  const { pathname } = useLocation()
+  if (pathname.startsWith('/taxon/')) return <BookwormBackground />
+  return <ElixirGraph />
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <KingdomProvider>
-        <KingdomBackdrop />
-        <ElixirGraph />
         <BrowserRouter>
+          <KingdomBackdrop />
+          <GlobalBackground />
           <Routes>
             <Route path="/" element={<ErrorBoundary><Shui /></ErrorBoundary>} />
             <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />

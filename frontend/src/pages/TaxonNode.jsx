@@ -7,6 +7,7 @@ import TaxonGraph from '../components/TaxonGraph'
 import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
+import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
 import '../theme/bookworm.css'
 
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
@@ -20,7 +21,9 @@ const RANK_ES = {
 }
 
 // Mini-mapa agregado: pinta todos los paises de las especies descendientes.
-function AggregateMap({ countries }) {
+// Clic en un pais filtra la lista (onSelectCountry). Si activeCountry/activeContinent
+// estan seteados, ese pais (o los paises de ese continente) se resaltan distinto.
+function AggregateMap({ countries, onSelectCountry, activeCountry, activeContinent }) {
   const [geo, setGeo] = useState(null)
   const targets = new Set((countries || []).map((c) => String(c).toUpperCase()))
   useEffect(() => {
@@ -29,16 +32,30 @@ function AggregateMap({ countries }) {
     return () => { alive = false }
   }, [])
   const styleFn = (f) => {
-    const active = targets.has(featureISO(f.properties))
+    const iso = featureISO(f.properties)
+    const active = targets.has(iso)
+    const isSelectedCountry = activeCountry && iso === activeCountry
+    const isSelectedContinent = !activeCountry && activeContinent && ISO_CONTINENT[iso] === activeContinent
+    if (isSelectedCountry || isSelectedContinent) {
+      return { fillColor: '#C89040', fillOpacity: 0.9, color: '#8A6040', weight: 1.4 }
+    }
     return { fillColor: active ? '#4A6040' : '#cabfa0', fillOpacity: active ? 0.8 : 0.15,
              color: active ? '#6A8050' : '#b8a888', weight: active ? 1 : 0.3 }
+  }
+  const onEach = (feature, layer) => {
+    const iso = featureISO(feature.properties)
+    if (targets.has(iso)) {
+      layer.on('click', () => onSelectCountry?.(iso))
+      layer.on('mouseover', (e) => e.target.setStyle({ weight: 1.6 }))
+      layer.on('mouseout', (e) => e.target.setStyle(styleFn(feature)))
+    }
   }
   return (
     <div className="bw-map">
       <MapContainer center={[20, 0]} zoom={1} minZoom={1} style={{ height: 340, width: '100%', background: '#cec4ac' }}
         attributionControl={false} zoomControl={true} scrollWheelZoom={false} worldCopyJump={true}>
         <TileLayer url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png" subdomains="abcd" maxZoom={6} />
-        {geo && <GeoJSON data={geo} style={styleFn} />}
+        {geo && <GeoJSON key={(activeCountry || '') + (activeContinent || '')} data={geo} style={styleFn} onEachFeature={onEach} />}
       </MapContainer>
     </div>
   )
@@ -46,7 +63,7 @@ function AggregateMap({ countries }) {
 
 // Sellos de contenido disponible para un hijo (especie o taxon superior).
 // Para especie: cuenta su propio contenido. Para taxon: cuantas especies descendientes lo tienen.
-function ContentFlags({ flags, isSpecies, conservation }) {
+function ContentFlags({ flags, isSpecies, conservation, commonNames }) {
   if (!flags) return null
   const items = []
   const Seal = ({ title, icon, n, color }) => (
@@ -65,6 +82,7 @@ function ContentFlags({ flags, isSpecies, conservation }) {
     if (flags.sounds > 0) items.push(<Seal key="s" title="Sonidos" icon={'\u266A'} n={flags.sounds} color="var(--bw-amber)" />)
     if (flags.descriptions > 0) items.push(<Seal key="d" title="Descripciones" icon={'\u2261'} n={flags.descriptions} color="var(--bw-bark)" />)
     if (flags.etymology > 0) items.push(<Seal key="e" title="Etimologia" icon={'\u00A7'} color="var(--bw-ochre)" />)
+    if (commonNames?.length > 0) items.push(<Seal key="cn" title={commonNames.join(', ')} icon={'\u2605'} color="var(--bw-ochre)" />)
     if (conservation) items.push(<Seal key="c" title={`Conservacion ${conservation}`} icon={conservation} color="var(--bw-danger)" />)
   } else {
     // taxon superior: cuantas especies descendientes con cada contenido
@@ -72,9 +90,22 @@ function ContentFlags({ flags, isSpecies, conservation }) {
     if (flags.images > 0) items.push(<Seal key="i" title="Especies con imagenes" icon={'\u25A3'} n={flags.images} color="var(--bw-moss)" />)
     if (flags.sounds > 0) items.push(<Seal key="s" title="Especies con sonidos" icon={'\u266A'} n={flags.sounds} color="var(--bw-amber)" />)
     if (flags.descriptions > 0) items.push(<Seal key="d" title="Especies con descripcion" icon={'\u2261'} n={flags.descriptions} color="var(--bw-bark)" />)
+    if (flags.common_names > 0) items.push(<Seal key="cn" title="Especies con nombre comun" icon={'\u2605'} n={flags.common_names} color="var(--bw-ochre)" />)
   }
   if (!items.length) return null
   return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>{items}</div>
+}
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+
+// Letra por la que se filtra/ordena alfabeticamente a un hijo. Si los hijos son
+// especies, el nombre siempre arranca con el genero heredado (p.ej. "Panthera leo"),
+// asi que la palabra relevante es la SEGUNDA; para cualquier otro rango se usa la
+// primera palabra del nombre tal cual.
+function alphaKeyOf(child, childRank) {
+  const words = (child.name || '').trim().split(/\s+/)
+  const word = childRank === 'species' ? (words[1] || words[0] || '') : (words[0] || '')
+  return word.charAt(0).toUpperCase()
 }
 
 export default function TaxonNode({ rank, nodeKey }) {
@@ -85,9 +116,21 @@ export default function TaxonNode({ rank, nodeKey }) {
   const { dark } = useTheme()
   useSetKingdom(data?.kingdom)
 
+  // filtros de contenido (checkboxes)
+  const [onlyImages, setOnlyImages] = useState(false)
+  const [onlyDescriptions, setOnlyDescriptions] = useState(false)
+  const [onlyCommonNames, setOnlyCommonNames] = useState(false)
+  // filtro alfabetico
+  const [activeLetter, setActiveLetter] = useState(null)
+  // filtro geografico (clic en el mapa)
+  const [activeCountry, setActiveCountry] = useState(null)
+  const [activeContinent, setActiveContinent] = useState(null)
+
   useEffect(() => {
     let alive = true
     setLoading(true); setError(null); setData(null)
+    setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false)
+    setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
     api.taxon(rank, nodeKey)
       .then((d) => { if (alive) { setData(d); setLoading(false) } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false) } })
@@ -99,6 +142,52 @@ export default function TaxonNode({ rank, nodeKey }) {
     else navigate(`/taxon/${child.rank}/${child.key}`)
   }
 
+  // ── Filtrado combinado de la lista de hijos ──
+  const children = data?.children || []
+  const childRank = data?.child_rank
+  const isSpeciesChild = childRank === 'species'
+
+  function hasImage(c) { return c.flags?.images > 0 }
+  function hasDescription(c) { return c.flags?.descriptions > 0 }
+  function hasCommonName(c) { return isSpeciesChild ? (c.common_names?.length > 0) : c.flags?.common_names > 0 }
+
+  // letras disponibles (con al menos un hijo) para deshabilitar el resto
+  const availableLetters = new Set(children.map((c) => alphaKeyOf(c, childRank)).filter(Boolean))
+
+  const filteredChildren = children.filter((c) => {
+    if (onlyImages && !hasImage(c)) return false
+    if (onlyDescriptions && !hasDescription(c)) return false
+    if (onlyCommonNames && !hasCommonName(c)) return false
+    if (activeLetter && alphaKeyOf(c, childRank) !== activeLetter) return false
+    if (activeCountry) {
+      const cs = (c.countries || []).map((x) => String(x).toUpperCase())
+      if (!cs.includes(activeCountry)) return false
+    } else if (activeContinent) {
+      const cs = (c.countries || []).map((x) => String(x).toUpperCase())
+      if (!cs.some((iso) => ISO_CONTINENT[iso] === activeContinent)) return false
+    }
+    return true
+  })
+
+  function selectCountry(iso) {
+    setActiveContinent(null)
+    setActiveCountry((prev) => (prev === iso ? null : iso))
+  }
+  function clearGeoFilter() { setActiveCountry(null); setActiveContinent(null) }
+  function clearAllFilters() {
+    setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false)
+    setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
+  }
+  const anyFilterActive = onlyImages || onlyDescriptions || onlyCommonNames || activeLetter || activeCountry || activeContinent
+  const availableContinents = [...new Set((data?.countries || [])
+    .map((iso) => ISO_CONTINENT[String(iso).toUpperCase()])
+    .filter(Boolean))].sort()
+
+  // Stats agregadas del taxon, calculadas desde los hijos directos
+  const totalImages = children.reduce((s, c) => s + (c.flags?.images || 0), 0)
+  const totalSounds = children.reduce((s, c) => s + (c.flags?.sounds || 0), 0)
+  const totalDesc   = children.reduce((s, c) => s + (c.flags?.descriptions || 0), 0)
+
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
       <div className="bw-page">
@@ -109,17 +198,29 @@ export default function TaxonNode({ rank, nodeKey }) {
 
         {data && (
           <>
-            <div style={{ marginTop: 18 }}>
-              <div className="bw-rank">{RANK_ES[data.rank] || data.rank}</div>
-              <h1>{data.name}</h1>
-              <p className="bw-muted">
-                {data.children.length} {RANK_ES[data.child_rank]?.toLowerCase() || data.child_rank}(s) directos
-                {data.species_count ? ` - ${data.species_count} especies descendientes` : ''}
-              </p>
+            {/* ── Zona 1: header ── */}
+            <div className="bw-header">
+              <div className="bw-header-title">
+                <div className="bw-rank">{RANK_ES[data.rank] || data.rank}</div>
+                <h1>{data.name}</h1>
+                <p className="bw-muted">
+                  {data.children.length} {RANK_ES[data.child_rank]?.toLowerCase() || data.child_rank}(s) directos
+                  {data.species_count > 0 && ` · ${data.species_count.toLocaleString()} especies descendientes`}
+                </p>
+                {/* Stats de contenido disponible */}
+                {data.species_count > 0 && (
+                  <div className="bw-stats">
+                    <span className="bw-stat"><span className="bw-stat-val">{data.countries?.length || 0}</span><span className="bw-stat-lbl">paises</span></span>
+                    {totalImages > 0 && <span className="bw-stat"><span className="bw-stat-val">{totalImages.toLocaleString()}</span><span className="bw-stat-lbl">imagenes</span></span>}
+                    {totalSounds > 0 && <span className="bw-stat"><span className="bw-stat-val">{totalSounds.toLocaleString()}</span><span className="bw-stat-lbl">sonidos</span></span>}
+                    {totalDesc > 0 && <span className="bw-stat"><span className="bw-stat-val">{totalDesc.toLocaleString()}</span><span className="bw-stat-lbl">descripciones</span></span>}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="bw-layout">
-              {/* Izquierda: grafo de navegacion */}
+            {/* ── Zona 2: grafo (izq) + mapa (der) ── */}
+            <div className="bw-mid-row">
               <div className="bw-graph-col">
                 <h2>Navegacion</h2>
                 <div className="bw-map" style={{ padding: 6 }}>
@@ -133,28 +234,105 @@ export default function TaxonNode({ rank, nodeKey }) {
                 </div>
               </div>
 
-              {/* Derecha: mapa + lista de hijos */}
-              <div className="bw-main-col">
-                {data.countries?.length > 0 && (
+              <div className="bw-map-col">
+                {data.countries?.length > 0 ? (
                   <>
                     <h2>Distribucion agregada</h2>
-                    <p className="bw-muted">Paises donde habita alguna especie de este grupo ({data.countries.length}).</p>
-                    <AggregateMap countries={data.countries} />
+                    <p className="bw-muted">
+                      {data.countries.length} {data.countries.length === 1 ? 'pais' : 'paises'}.
+                      {' '}Clic en un pais para filtrar la lista.
+                    </p>
+                    <AggregateMap
+                      countries={data.countries}
+                      onSelectCountry={selectCountry}
+                      activeCountry={activeCountry}
+                      activeContinent={activeContinent}
+                    />
+                    {availableContinents.length > 0 && (
+                      <div className="bw-filters" style={{ marginTop: 8 }}>
+                        {availableContinents.map((cont) => (
+                          <button
+                            key={cont}
+                            className={`bw-btn bw-filter-tag ${activeContinent === cont ? 'active' : ''}`}
+                            onClick={() => { setActiveCountry(null); setActiveContinent((prev) => (prev === cont ? null : cont)) }}
+                          >{cont}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h2>Distribucion agregada</h2>
+                    <p className="bw-muted">Sin datos de distribucion para este grupo.</p>
                   </>
                 )}
+              </div>
+            </div>
 
-                <h2>{RANK_ES[data.child_rank] || data.child_rank}s</h2>
-                <div className="bw-children">
-                  {data.children.map((c, i) => (
-                    <div key={i} className="bw-child" onClick={() => openChild(c)}>
+            {/* ── Zona 3: lista de hijos a ancho completo ── */}
+            <div className="bw-list-section">
+              <h2>{RANK_ES[data.child_rank] || data.child_rank}s</h2>
+
+              {/* Filtros de contenido */}
+              <div className="bw-filters">
+                <label className="bw-filter-chk">
+                  <input type="checkbox" checked={onlyImages} onChange={(e) => setOnlyImages(e.target.checked)} />
+                  Con imagen
+                </label>
+                <label className="bw-filter-chk">
+                  <input type="checkbox" checked={onlyDescriptions} onChange={(e) => setOnlyDescriptions(e.target.checked)} />
+                  Con descripcion
+                </label>
+                <label className="bw-filter-chk">
+                  <input type="checkbox" checked={onlyCommonNames} onChange={(e) => setOnlyCommonNames(e.target.checked)} />
+                  Con nombre comun
+                </label>
+                {(activeCountry || activeContinent) && (
+                  <button className="bw-btn bw-filter-tag" onClick={clearGeoFilter}>
+                    {activeCountry ? isoToName(activeCountry) : activeContinent} {'\u00D7'}
+                  </button>
+                )}
+                {anyFilterActive && (
+                  <button className="bw-btn" onClick={clearAllFilters} style={{ marginLeft: 'auto' }}>Limpiar filtros</button>
+                )}
+              </div>
+
+              {/* Filtro alfabetico */}
+              <div className="bw-alpha">
+                <button
+                  className={`bw-alpha-letter ${!activeLetter ? 'active' : ''}`}
+                  onClick={() => setActiveLetter(null)}
+                >Todas</button>
+                {ALPHABET.map((letter) => (
+                  <button
+                    key={letter}
+                    className={`bw-alpha-letter ${activeLetter === letter ? 'active' : ''}`}
+                    disabled={!availableLetters.has(letter)}
+                    onClick={() => setActiveLetter((prev) => (prev === letter ? null : letter))}
+                  >{letter}</button>
+                ))}
+              </div>
+
+              <div className="bw-children">
+                {filteredChildren.map((c, i) => (
+                  <div key={i} className="bw-child" onClick={() => openChild(c)}>
+                    <div className="bw-child-info">
                       <div className="bw-rank">{RANK_ES[c.rank] || c.rank}</div>
                       <div style={{ fontStyle: c.rank === 'species' ? 'italic' : 'normal' }}>{c.name}</div>
-                      <ContentFlags flags={c.flags} isSpecies={c.rank === 'species'} conservation={c.conservation} />
+                      <ContentFlags flags={c.flags} isSpecies={c.rank === 'species'} conservation={c.conservation} commonNames={c.common_names} />
                     </div>
-                  ))}
-                </div>
-                {data.children.length === 0 && <p className="bw-muted">Sin hijos directos registrados.</p>}
+                    {c.rank === 'species' && c.image && (
+                      <div className="bw-child-thumb">
+                        <img src={c.image} alt={c.name} loading="lazy" />
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
+              {data.children.length === 0 && <p className="bw-muted">Sin hijos directos registrados.</p>}
+              {data.children.length > 0 && filteredChildren.length === 0 && (
+                <p className="bw-muted">Ningun resultado con los filtros activos.</p>
+              )}
             </div>
           </>
         )}

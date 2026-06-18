@@ -6,7 +6,7 @@ import { ESTABLISHMENT } from '../api/client'
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
 
 // ISO-A2 -> continente (mismo mapeo que el backend) para el sombreado tenue.
-const ISO_CONTINENT = {
+export const ISO_CONTINENT = {
  AD:'Europe',AE:'Asia',AF:'Asia',AG:'North America',AI:'North America',AL:'Europe',AM:'Asia',AO:'Africa',AQ:'Antarctica',AR:'South America',AS:'Oceania',AT:'Europe',AU:'Oceania',AW:'North America',AX:'Europe',AZ:'Asia',
  BA:'Europe',BB:'North America',BD:'Asia',BE:'Europe',BF:'Africa',BG:'Europe',BH:'Asia',BI:'Africa',BJ:'Africa',BL:'North America',BM:'North America',BN:'Asia',BO:'South America',BQ:'North America',BR:'South America',BS:'North America',BT:'Asia',BV:'Antarctica',BW:'Africa',BY:'Europe',BZ:'North America',
  CA:'North America',CC:'Asia',CD:'Africa',CF:'Africa',CG:'Africa',CH:'Europe',CI:'Africa',CK:'Oceania',CL:'South America',CM:'Africa',CN:'Asia',CO:'South America',CR:'North America',CU:'North America',CV:'Africa',CW:'North America',CX:'Asia',CY:'Asia',CZ:'Europe',

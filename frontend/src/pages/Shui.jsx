@@ -25,6 +25,19 @@ function swatchFor(kingdom, dark) {
 // Reinos activos por defecto (el resto arranca desmarcado)
 const DEFAULT_KINGDOMS = ['Animalia', 'Plantae', 'Fungi']
 
+// Deriva { domainName: [{key,name}, ...] } a partir de los nodos/links reales del
+// grafo inicial (Biota->Domain->Kingdom), en vez de hardcodear el agrupamiento.
+function deriveDomainGroups(full) {
+  if (!full) return []
+  const byId = Object.fromEntries(full.nodes.map((n) => [n.id, n]))
+  const domains = full.nodes.filter((n) => n.rank === 'domain')
+  return domains.map((d) => {
+    const kingdomIds = full.links.filter((l) => l.source === d.id).map((l) => l.target)
+    const kids = kingdomIds.map((id) => byId[id]).filter((n) => n && n.rank === 'kingdom')
+    return { id: d.id, name: d.name, kingdoms: kids }
+  })
+}
+
 export default function Shui() {
   const navigate = useNavigate()
   const { dark } = useTheme()
@@ -36,6 +49,7 @@ export default function Shui() {
   // reinos y cuales estan activos (checkboxes izquierda)
   const [kingdoms, setKingdoms] = useState([])
   const [activeKingdoms, setActiveKingdoms] = useState(new Set())
+  const [domainGroups, setDomainGroups] = useState([])
 
   // buscador
   const [q, setQ] = useState('')
@@ -67,7 +81,7 @@ export default function Shui() {
   useSetKingdom(focusKingdom)
 
   useEffect(() => {
-    api.graph().then((g) => { setGraphData(g); setFullGraph(g) }).catch(() => {})
+    api.graph().then((g) => { setGraphData(g); setFullGraph(g); setDomainGroups(deriveDomainGroups(g)) }).catch(() => {})
     api.continents().then(setContinents).catch(() => {})
     api.kingdoms().then((ks) => {
       setKingdoms(ks)
@@ -86,9 +100,9 @@ export default function Shui() {
     if (focusNode || !fullGraphRef.current) return
     const full = fullGraphRef.current
     const keepKingdomNames = activeKingdoms
-    // nodos: biota + reinos activos + filos de reinos activos
+    // nodos: biota + TODOS los dominios (siempre visibles) + reinos activos
     const nodes = full.nodes.filter((n) => {
-      if (n.rank === 'root') return true
+      if (n.rank === 'root' || n.rank === 'domain') return true
       return keepKingdomNames.has(n.kingdom)
     })
     const ids = new Set(nodes.map((n) => n.id))
@@ -128,6 +142,27 @@ export default function Shui() {
       next.has(name) ? next.delete(name) : next.add(name)
       return next
     })
+  }
+
+  // Click en el checkbox de un Domain: si todos sus reinos estan activos, los
+  // desactiva todos; si no, activa los que falten (selecciona el grupo completo).
+  function toggleDomain(group) {
+    const names = group.kingdoms.map((k) => k.name)
+    setActiveKingdoms((prev) => {
+      const allOn = names.every((n) => prev.has(n))
+      const next = new Set(prev)
+      names.forEach((n) => (allOn ? next.delete(n) : next.add(n)))
+      return next
+    })
+  }
+  // Estado del checkbox padre: 'all' | 'none' | 'partial' (indeterminate)
+  function domainCheckState(group) {
+    const names = group.kingdoms.map((k) => k.name)
+    if (names.length === 0) return 'none'
+    const onCount = names.filter((n) => activeKingdoms.has(n)).length
+    if (onCount === 0) return 'none'
+    if (onCount === names.length) return 'all'
+    return 'partial'
   }
 
   function onSearch(value) {
@@ -193,13 +228,32 @@ export default function Shui() {
           {/* Izquierda: reinos */}
           <aside className="sh-side">
             <h3>Reinos</h3>
-            {kingdoms.map((k) => (
-              <label key={k.key} className="sh-check">
-                <input type="checkbox" checked={activeKingdoms.has(k.name)} onChange={() => toggleKingdom(k.name)} disabled={!!focusNode} />
-                <span className="sh-swatch" style={{ background: swatchFor(k.name, dark) }} />
-                {k.name}
-              </label>
-            ))}
+            {domainGroups.map((g) => {
+              const state = domainCheckState(g)
+              return (
+                <div key={g.id} className="sh-domain-group">
+                  <label className="sh-check sh-check-domain">
+                    <input
+                      type="checkbox"
+                      checked={state === 'all'}
+                      ref={(el) => { if (el) el.indeterminate = state === 'partial' }}
+                      onChange={() => toggleDomain(g)}
+                      disabled={!!focusNode}
+                    />
+                    <span className="sh-domain-name">{g.name}</span>
+                  </label>
+                  <div className="sh-kingdom-sublist">
+                    {g.kingdoms.map((k) => (
+                      <label key={k.key} className="sh-check sh-check-sub">
+                        <input type="checkbox" checked={activeKingdoms.has(k.name)} onChange={() => toggleKingdom(k.name)} disabled={!!focusNode} />
+                        <span className="sh-swatch" style={{ background: swatchFor(k.name, dark) }} />
+                        {k.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
             {focusNode && <p style={{ fontSize: 10, color: 'var(--sh-text2)', marginTop: 10 }}>Reinicia el grafo para filtrar por reino.</p>}
           </aside>
 
@@ -224,6 +278,17 @@ export default function Shui() {
               {countries.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
             </select>
             <button className="sh-kbtn" style={{ width: '100%', marginTop: 10 }} onClick={applyCountryFilter} disabled={!country}>Filtrar especies</button>
+
+            <h3 style={{ marginTop: 22 }}>Vista</h3>
+            <button
+              className="sh-kbtn"
+              style={{ width: '100%' }}
+              disabled={!focusNode}
+              title={focusNode ? '' : 'Selecciona un nodo del grafo para explorarlo como lista'}
+              onClick={() => focusNode && navigate(`/taxon/${focusNode.rank}/${focusNode.key}`)}
+            >
+              Explorar como lista
+            </button>
           </aside>
         </div>
 

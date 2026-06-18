@@ -2,6 +2,13 @@
    LinNeo -- Tema bookworm (vistas de media y nodos taxonomicos)
    Se activa envolviendo la vista en .bookworm-scope
 ============================================================ */
+
+/* Anular los pseudo-elementos globales de tokens.css (triangulos isometricos
+   de body::before y scanlines de body::after) cuando la vista bookworm esta
+   activa. :has() soportado en Chrome 105+, Firefox 121+, Safari 15.4+. */
+body:has(.bookworm-scope)::before,
+body:has(.bookworm-scope)::after { display: none; }
+
 .bookworm-scope {
   --bw-bg:#E8E0D0; --bw-bg2:#DDD5C0; --bw-bg3:#CEC4AC; --bw-text:#1C160C; --bw-text2:#5A4E38;
   --bw-border:#B8A888; --bw-moss:#4A6040; --bw-bark:#6A4828; --bw-ochre:#B08030; --bw-amber:#C89040;
@@ -26,8 +33,33 @@ body.dark .bookworm-scope {
 .bookworm-scope .bw-child {
   background: var(--bw-bg2); border: 1px solid var(--bw-border); border-left: 3px solid var(--bw-moss);
   border-radius: var(--bw-radius); padding: 10px 14px; cursor: pointer; transition: all .15s; font-size: 14px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
 }
 .bookworm-scope .bw-child:hover { border-left-color: var(--bw-amber); transform: translateX(2px); }
+.bookworm-scope .bw-child-info { min-width: 0; flex: 1; }
+.bookworm-scope .bw-child-thumb {
+  flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+  border: 1px solid var(--bw-border); background: var(--bw-bg3);
+}
+.bookworm-scope .bw-child-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ── Filtros (TaxonNode) ── */
+.bookworm-scope .bw-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0 12px; }
+.bookworm-scope .bw-filter-chk { display: flex; align-items: center; gap: 6px; font-family: var(--bw-mono); font-size: 11px; color: var(--bw-text2); cursor: pointer; }
+.bookworm-scope .bw-filter-chk input { accent-color: var(--bw-accent); cursor: pointer; }
+.bookworm-scope .bw-filter-tag { display: inline-flex; align-items: center; gap: 4px; }
+.bookworm-scope .bw-filter-tag.active { border-color: var(--bw-accent); color: var(--bw-accent); }
+
+/* barra alfabetica */
+.bookworm-scope .bw-alpha { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 14px; }
+.bookworm-scope .bw-alpha-letter {
+  font-family: var(--bw-mono); font-size: 11px; min-width: 22px; padding: 4px 6px;
+  border: 1px solid var(--bw-border); border-radius: var(--bw-radius);
+  background: var(--bw-bg2); color: var(--bw-text2); cursor: pointer; text-align: center;
+}
+.bookworm-scope .bw-alpha-letter:hover:not(:disabled) { border-color: var(--bw-accent); color: var(--bw-accent); }
+.bookworm-scope .bw-alpha-letter.active { border-color: var(--bw-accent); background: var(--bw-accent); color: var(--bw-bg); }
+.bookworm-scope .bw-alpha-letter:disabled { opacity: .3; cursor: not-allowed; }
 .bookworm-scope .bw-btn {
   font-family: var(--bw-mono); font-size: 12px; padding: 7px 16px; border: 1px solid var(--bw-border);
   border-radius: var(--bw-radius); background: var(--bw-bg2); color: var(--bw-text2); cursor: pointer; letter-spacing: .04em;
@@ -35,11 +67,24 @@ body.dark .bookworm-scope {
 .bookworm-scope .bw-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }
 .bookworm-scope .bw-map { border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; margin: 12px 0; }
 
-/* Layout de 2 columnas en TaxonNode: grafo (izq, sticky) + contenido (der) */
-.bookworm-scope .bw-layout { display: grid; grid-template-columns: 38% 62%; gap: 20px; align-items: start; margin-top: 10px; }
+/* ── Layout de 3 zonas en TaxonNode ── */
+.bookworm-scope .bw-header { margin-top: 18px; margin-bottom: 20px; }
+.bookworm-scope .bw-header-title h1 { margin: 2px 0 4px; }
+
+/* Stats de contenido del taxon */
+.bookworm-scope .bw-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
+.bookworm-scope .bw-stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; }
+.bookworm-scope .bw-stat-val { font-family: var(--bw-mono); font-size: 20px; font-weight: 700; color: var(--bw-accent); line-height: 1; }
+.bookworm-scope .bw-stat-lbl { font-family: var(--bw-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--bw-text2); margin-top: 2px; }
+
+/* Fila media: grafo (izq, sticky) + mapa (der, mas ancho) */
+.bookworm-scope .bw-mid-row { display: grid; grid-template-columns: 36% 64%; gap: 20px; align-items: start; margin-bottom: 28px; }
 .bookworm-scope .bw-graph-col { position: sticky; top: 20px; }
-.bookworm-scope .bw-main-col { min-width: 0; }
+.bookworm-scope .bw-map-col { min-width: 0; }
 @media (max-width: 860px) {
-  .bookworm-scope .bw-layout { grid-template-columns: 1fr; }
+  .bookworm-scope .bw-mid-row { grid-template-columns: 1fr; }
   .bookworm-scope .bw-graph-col { position: static; }
 }
+
+/* Lista a ancho completo */
+.bookworm-scope .bw-list-section { border-top: 1px solid var(--bw-border); padding-top: 20px; }

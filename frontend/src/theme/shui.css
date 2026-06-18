@@ -63,35 +63,31 @@ body.dark .shui-scope {
   flex-shrink: 0; height: 14px; position: relative; z-index: 6;
 }
 
-/* cajon deslizable de ejemplos: en flujo (empuja el grafo al abrir), altura animada.
-   overflow visible para que las flamas de sh-kbox asomen por encima del borde cuando esta cerrado;
-   el resto de cada caja (imagen, fondo, texto) se desvanece cuando esta cerrado. */
+/* cajon deslizable de ejemplos: altura fija reservada en el flujo (empuja el grafo
+   solo cuando esta abierto). El bloque entero (cajas + flamas + boton) se mueve con
+   `bottom`, asi las flamas viajan junto con todo lo demas en vez de quedar estaticas. */
 .shui-scope .sh-kbar-drawer {
+  --sh-kbar-h: 200px;       /* alto total del cajon abierto */
+  --sh-kbar-peek: 26px;     /* cuanto asoma (cajas+flamas) cuando esta cerrado */
   flex-shrink: 0; overflow: visible; position: relative; z-index: 6;
-  height: 26px; transition: height .32s ease;
+  height: 0; transition: height .32s ease;
 }
-.shui-scope .sh-kbar-drawer.open { height: 200px; }
-.shui-scope .sh-kbar-drawer::before {
-  content: '';
-  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+.shui-scope .sh-kbar-drawer.open { height: var(--sh-kbar-h); }
+.shui-scope .sh-kbar-drawer-inner {
+  position: absolute; left: 0; right: 0; height: var(--sh-kbar-h);
+  display: flex; flex-direction: column-reverse;
   background: var(--sh-bg2);
   border-top: 1px solid var(--sh-border);
-  z-index: -1;
-  opacity: 0; transition: opacity .32s ease;
+  /* cerrado: el bloque se hunde dejando solo --sh-kbar-peek visible.
+     column-reverse pone las cajas (sh-kbar) al fondo visual del bloque, asi lo que
+     asoma cerrado son las cajas con sus flamas, no el boton de acciones. */
+  bottom: calc(var(--sh-kbar-peek) - var(--sh-kbar-h));
+  transition: bottom .32s ease;
 }
-.shui-scope .sh-kbar-drawer.open::before { opacity: 1; }
-.shui-scope .sh-kbar-drawer-inner {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  display: flex; flex-direction: column;
-}
-/* cerrado: oculta cuerpo de las cajas (fondo, borde, imagen, texto) pero deja vivas las flamas */
-.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox { background: transparent; border-color: transparent; }
-.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox img,
-.shui-scope .sh-kbar-drawer:not(.open) .sh-kbox .label { opacity: 0; transition: opacity .2s ease; }
-.shui-scope .sh-kbar-drawer:not(.open) .sh-kbar-actions { opacity: 0; pointer-events: none; }
+.shui-scope .sh-kbar-drawer.open .sh-kbar-drawer-inner { bottom: 0; }
 
-.shui-scope .sh-kbar { position: relative; display: flex; gap: 10px; padding: 0 20px 10px; overflow-x: auto; overflow-y: visible; flex-shrink: 0; }
-.shui-scope .sh-kbar-actions { display: flex; gap: 8px; padding: 0 20px 14px; flex-shrink: 0; transition: opacity .2s ease; }
+.shui-scope .sh-kbar { position: relative; display: flex; gap: 10px; padding: 16px 20px 10px; overflow-x: auto; overflow-y: visible; flex-shrink: 0; }
+.shui-scope .sh-kbar-actions { display: flex; gap: 8px; padding: 0 20px 14px; flex-shrink: 0; }
 .shui-scope .sh-kbox {
   position: relative; flex: 1; min-width: 120px; height: 110px; border-radius: 10px;
   cursor: pointer; border: 1px solid var(--sh-border); background: var(--sh-bg2);
@@ -124,6 +120,8 @@ body.dark .shui-scope {
   border-radius: var(--sh-radius); background: var(--sh-bg2); color: var(--sh-text2); cursor: pointer;
 }
 .shui-scope .sh-kbtn:hover { border-color: var(--sh-accent); color: var(--sh-accent); }
+.shui-scope .sh-kbtn:disabled { opacity: .4; cursor: not-allowed; }
+.shui-scope .sh-kbtn:disabled:hover { border-color: var(--sh-border); color: var(--sh-text2); }
 
 /* ── Layout con barras laterales ── */
 .shui-scope .sh-body { flex: 1; display: flex; min-height: 0; }
@@ -132,6 +130,10 @@ body.dark .shui-scope {
 .shui-scope .sh-side h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--sh-accent); margin-bottom: 12px; }
 .shui-scope .sh-check { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; cursor: pointer; }
 .shui-scope .sh-check input { accent-color: var(--sh-accent); cursor: pointer; }
+.shui-scope .sh-domain-group { margin-bottom: 4px; }
+.shui-scope .sh-check-domain { font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: .06em; color: var(--sh-text2); }
+.shui-scope .sh-kingdom-sublist { margin-left: 20px; border-left: 1px solid var(--sh-border); padding-left: 10px; }
+.shui-scope .sh-check-sub { font-size: 12px; }
 .shui-scope .sh-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .shui-scope .sh-center-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .shui-scope .sh-side label.sh-fieldlabel { display: block; font-size: 10px; color: var(--sh-text2); margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .08em; }

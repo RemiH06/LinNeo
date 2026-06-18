@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { forceSimulation, forceManyBody, forceCollide } from 'd3-force'
 import { useTheme } from '../theme/ThemeContext'
-import { nodeColor } from '../theme/kingdomColor'
+import { nodeColor, domainColors } from '../theme/kingdomColor'
 
 /*
   Grafo principal de shui.
@@ -84,11 +84,44 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
       angle += span
     })
 
-    const rankRadius = { root: 13, kingdom: 11, phylum: 8, class: 7, order: 6, family: 5, genus: 4, species: 4 }
+    const rankRadius = { root: 13, domain: 12, kingdom: 11, phylum: 8, class: 7, order: 6, family: 5, genus: 4, species: 4 }
     const radiusOf = (n) => rankRadius[n.rank] || 5
+    // Reino que tine el subgrafo en foco. Viene del backend (data.kingdom) cuando
+    // estas explorando dentro de un kingdom; null en la vista general (Biota).
+    // IMPORTANTE: domain y kingdom NUNCA se retinen por esto -- mantienen su propio
+    // color fijo siempre. Solo phylum/class/order/family/genus/species heredan el
+    // color del kingdom enfocado, sin importar cuanto se navegue dentro de el.
+    const focusedKingdom = data.kingdom || null
     const colorOf = (n) => {
       if (n.rank === 'root') return dark ? '#A0E8F8' : '#1878A0' // Biota neutro
-      return nodeColor(n.kingdom, n.rank, dark)
+      if (n.rank === 'domain' || n.rank === 'kingdom') return nodeColor(n.kingdom || n.name, 'kingdom', dark)
+      return nodeColor(focusedKingdom || n.kingdom, n.rank, dark)
+    }
+    // Nodos Domain con mas de un kingdom hijo (Eukaryota, Prokaryota) se pintan como
+    // 'canicas': varios circulos pequenos superpuestos, uno por color de kingdom hijo.
+    // Viruses / incertae sedis tienen un solo kingdom hijo -> color unico, sin canicas.
+    const drawNode = (n, r) => {
+      const isMultiDomain = n.rank === 'domain' && (domainColors(n.name, dark).length > 1)
+      if (isMultiDomain) {
+        const colors = domainColors(n.name, dark)
+        const k = colors.length
+        const marbleR = r * 0.62
+        const orbit = r * 0.42
+        if (n.id === data.center) { ctx.shadowColor = colors[0]; ctx.shadowBlur = 16 }
+        colors.forEach((col, i) => {
+          const a = (i / k) * Math.PI * 2 - Math.PI / 2
+          const mx = n.x + Math.cos(a) * orbit
+          const my = n.y + Math.sin(a) * orbit
+          ctx.beginPath(); ctx.arc(mx, my, marbleR, 0, Math.PI * 2)
+          ctx.fillStyle = col; ctx.fill()
+        })
+        ctx.shadowBlur = 0
+        return
+      }
+      ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
+      ctx.fillStyle = colorOf(n)
+      if (n.id === data.center) { ctx.shadowColor = colorOf(n); ctx.shadowBlur = 16 }
+      ctx.fill(); ctx.shadowBlur = 0
     }
 
     // simulacion muy suave: solo evita solapes y mantiene el radio, sin link force que desordene
@@ -102,6 +135,21 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, W, H)
       ctx.translate(view.x, view.y); ctx.scale(view.k, view.k)
+
+      // Luz trasera del reino enfocado, detras de todo (estilo SpeciesDetail).
+      const centerNode = byId[data.center]
+      if (focusedKingdom && centerNode) {
+        const glowR = Math.min(W, H) * 0.5
+        const grad = ctx.createRadialGradient(centerNode.x, centerNode.y, 0, centerNode.x, centerNode.y, glowR)
+        grad.addColorStop(0, nodeColor(focusedKingdom, 'kingdom', dark))
+        grad.addColorStop(1, 'transparent')
+        ctx.save()
+        ctx.globalAlpha = dark ? 0.30 : 0.20
+        ctx.fillStyle = grad
+        ctx.fillRect(centerNode.x - glowR, centerNode.y - glowR, glowR * 2, glowR * 2)
+        ctx.restore()
+      }
+
       ctx.lineWidth = 1 / view.k
       for (const l of links) {
         const s = typeof l.source === 'object' ? l.source : byId[l.source]
@@ -113,14 +161,9 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
       ctx.globalAlpha = 1
       for (const n of nodes) {
         const r = radiusOf(n)
-        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2)
-        ctx.fillStyle = colorOf(n)
-        if (n.id === data.center) {
-          ctx.shadowColor = colorOf(n); ctx.shadowBlur = 16
-        }
-        ctx.fill(); ctx.shadowBlur = 0
-        // etiquetas: centro, reinos y filos; el resto en zoom alto
-        const showLabel = n.rank === 'root' || n.rank === 'kingdom' || n.id === data.center || view.k > 1.4 || n.rank === 'phylum'
+        drawNode(n, r)
+        // etiquetas: centro, reinos/dominios y filos; el resto en zoom alto
+        const showLabel = n.rank === 'root' || n.rank === 'domain' || n.rank === 'kingdom' || n.id === data.center || view.k > 1.4 || n.rank === 'phylum'
         if (showLabel) {
           ctx.font = `${n.id === data.center ? 'bold ' : ''}${11 / view.k}px Recursive, monospace`
           ctx.fillStyle = textColor; ctx.textAlign = 'left'

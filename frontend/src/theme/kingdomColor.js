@@ -71,3 +71,19 @@ export function nodeColor(kingdom, rank, dark) {
 export const KINGDOM_WHEEL = [
   'Viruses', 'Archaea', 'Animalia', 'Plantae', 'Chromista', 'Bacteria', 'Fungi', 'Protozoa', 'incertae sedis',
 ]
+
+// Reinos (Kingdom) que agrupa cada Domain. Determina el patron de color del nodo Domain.
+export const DOMAIN_KINGDOMS = {
+  Eukaryota: ['Animalia', 'Plantae', 'Fungi', 'Chromista', 'Protozoa'],
+  Prokaryota: ['Archaea', 'Bacteria'],
+  Viruses: ['Viruses'],
+  'incertae sedis': ['incertae sedis'],
+}
+
+// Colores (uno por kingdom hijo) para pintar un Domain como 'canicas' superpuestas.
+// Eukaryota/Prokaryota -> varios colores (uno por reino). Viruses/incertae sedis ->
+// un solo color fijo (su propio hue/gris), sin necesidad de patron.
+export function domainColors(domain, dark) {
+  const kingdoms = DOMAIN_KINGDOMS[domain] || []
+  return kingdoms.map((k) => nodeColor(k, 'kingdom', dark))
+}

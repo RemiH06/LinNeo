@@ -4,6 +4,7 @@ from .db import run_query
 
 # Etiqueta Neo4j y propiedad-key por rango taxonomico
 RANK_LABEL = {
+    "domain":  ("Domain",  "domain_key"),
     "kingdom": ("Kingdom", "kingdom_key"),
     "phylum":  ("Phylum",  "phylum_key"),
     "class":   ("Class",   "class_key"),
@@ -14,7 +15,7 @@ RANK_LABEL = {
 }
 # rango hijo inmediato
 CHILD_RANK = {
-    "kingdom": "phylum", "phylum": "class", "class": "order",
+    "domain": "kingdom", "kingdom": "phylum", "phylum": "class", "class": "order",
     "order": "family", "family": "genus", "genus": "species",
 }
 
@@ -94,15 +95,15 @@ def get_species_detail(species_key: int):
 
 
 def get_taxonomy_path(species_key: int):
-    """Linaje Kingdom->Species, con rank, nombre y key de cada nodo (para navegar)."""
+    """Linaje Domain->Kingdom->...->Species, con rank, nombre y key de cada nodo (para navegar)."""
     cypher = """
     MATCH (s:Species {species_key: $key})
-    OPTIONAL MATCH path = (k:Kingdom)-[:HAS_CHILD*]->(s)
+    OPTIONAL MATCH path = (d:Domain)-[:HAS_CHILD*]->(s)
     WITH nodes(path) AS chain
     RETURN [n IN chain | {
         rank: toLower(labels(n)[0]),
         name: coalesce(n.canonical_name, n.name, n.scientific_name),
-        key: coalesce(n.kingdom_key, n.phylum_key, n.class_key, n.order_key, n.family_key, n.genus_key, n.species_key)
+        key: coalesce(n.domain_key, n.kingdom_key, n.phylum_key, n.class_key, n.order_key, n.family_key, n.genus_key, n.species_key)
     }] AS lineage
     LIMIT 1
     """
@@ -183,12 +184,17 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
              count(DISTINCT ms) AS n_snd,
              count(DISTINCT d)  AS n_desc,
              count(DISTINCT et) AS n_etym,
-             count(DISTINCT co) AS n_country
+             count(DISTINCT co) AS n_country,
+             head(collect(DISTINCT mi.url)) AS image,
+             collect(DISTINCT co.key) AS countries
         RETURN collect({{
             name: coalesce(c.canonical_name, c.scientific_name),
             key: c.species_key,
             rank: 'species',
             conservation: c.conservation_overall_code,
+            image: image,
+            common_names: c.commonNames,
+            countries: countries,
             flags: {{images: n_img, sounds: n_snd, descriptions: n_desc, etymology: n_etym, countries: n_country}}
         }}) AS children
         """
@@ -203,12 +209,13 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
              count(DISTINCT s) AS n_species,
              count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'image'}}) }} THEN s END) AS sp_img,
              count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'sound'}}) }} THEN s END) AS sp_snd,
-             count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }} THEN s END) AS sp_desc
+             count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }} THEN s END) AS sp_desc,
+             count(DISTINCT CASE WHEN size(coalesce(s.commonNames, [])) > 0 THEN s END) AS sp_common
         RETURN collect({{
             name: coalesce(c.canonical_name, c.name, c.scientific_name),
             key: c.{child_keyprop},
             rank: '{child_rank}',
-            flags: {{species: n_species, images: sp_img, sounds: sp_snd, descriptions: sp_desc}}
+            flags: {{species: n_species, images: sp_img, sounds: sp_snd, descriptions: sp_desc, common_names: sp_common}}
         }}) AS children
         """
     crows = run_query(children_cypher, {"key": key, "climit": child_limit})
@@ -309,30 +316,32 @@ def list_kingdoms():
 
 def graph_default():
     """
-    Grafo inicial de shui: nodo virtual 'Biota' -> reinos -> filos.
-    Cada nodo lleva su 'kingdom' para colorearse. Biota es virtual (key null).
+    Grafo inicial de shui: nodo virtual 'Biota' -> dominios -> reinos.
+    Cada nodo lleva su 'kingdom' para colorearse (Domain no se tinta de un solo
+    kingdom en frontend si agrupa varios -- eso lo resuelve ShuiGraph con el
+    patron de 'canicas' usando domainColors()). Biota es virtual (key null).
     """
     nodes = [{"id": "biota", "name": "Biota", "rank": "root", "key": None, "kingdom": None}]
     links = []
-    kingdoms = run_query("""
-        MATCH (k:Kingdom)
-        OPTIONAL MATCH (k)-[:HAS_CHILD]->(p:Phylum)
-        WITH k, p ORDER BY coalesce(p.canonical_name, p.name)
-        RETURN k.kingdom_key AS kkey, coalesce(k.canonical_name, k.name) AS kname,
-               collect(DISTINCT {key: p.phylum_key, name: coalesce(p.canonical_name, p.name)}) AS phyla
+    domains = run_query("""
+        MATCH (d:Domain)
+        OPTIONAL MATCH (d)-[:HAS_CHILD]->(k:Kingdom)
+        WITH d, k ORDER BY coalesce(k.canonical_name, k.name)
+        RETURN d.domain_key AS dkey, coalesce(d.canonical_name, d.name) AS dname,
+               collect(DISTINCT {key: k.kingdom_key, name: coalesce(k.canonical_name, k.name)}) AS kingdoms
     """)
-    for k in kingdoms:
-        kid = f"kingdom:{k['kkey']}"
-        nodes.append({"id": kid, "name": k["kname"], "rank": "kingdom",
-                      "key": k["kkey"], "kingdom": k["kname"]})
-        links.append({"source": "biota", "target": kid})
-        for p in k["phyla"]:
-            if not p.get("name"):
+    for d in domains:
+        did = f"domain:{d['dkey']}"
+        nodes.append({"id": did, "name": d["dname"], "rank": "domain",
+                      "key": d["dkey"], "kingdom": None})
+        links.append({"source": "biota", "target": did})
+        for k in d["kingdoms"]:
+            if not k.get("name"):
                 continue
-            pid = f"phylum:{p['key']}"
-            nodes.append({"id": pid, "name": p["name"], "rank": "phylum",
-                          "key": p["key"], "kingdom": k["kname"]})
-            links.append({"source": kid, "target": pid})
+            kid = f"kingdom:{k['key']}"
+            nodes.append({"id": kid, "name": k["name"], "rank": "kingdom",
+                          "key": k["key"], "kingdom": k["name"]})
+            links.append({"source": did, "target": kid})
     return {"nodes": nodes, "links": links, "center": "biota", "kingdom": None}
 
 
@@ -346,7 +355,11 @@ def graph_focus(rank: str, key: int, depth: int = 1):
         return None
     label, keyprop = RANK_LABEL[rank]
 
-    # reino del nodo (para tintar)
+    # reino del nodo (para tintar). El nodo Kingdom no tiene una propiedad propia
+    # 'kingdom' en Neo4j (esa propiedad esta denormalizada en Species/Genus/etc para
+    # queries rapidas) -- si el rank enfocado es justo 'kingdom', su propio nombre
+    # ES el reino de tinte (igual patron que graph_default). Domain mismo caso pero
+    # ese se resuelve aparte, no se tinta un solo color (ver mas abajo).
     krow = run_query(f"""
         MATCH (n:{label} {{{keyprop}: $key}})
         RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
@@ -355,7 +368,7 @@ def graph_focus(rank: str, key: int, depth: int = 1):
     if not krow:
         return None
     center_name = krow[0]["name"]
-    kingdom = krow[0]["kingdom"]
+    kingdom = center_name if rank == "kingdom" else krow[0]["kingdom"]
 
     # cadena de rangos hacia abajo desde `rank`
     chain = []
@@ -383,14 +396,19 @@ def graph_focus(rank: str, key: int, depth: int = 1):
             if not c.get("name"):
                 continue
             cid = f"{chain[0]}:{c['key']}"
+            # Si los hijos directos son Kingdom (centro = Domain), cada uno se tinta
+            # de SU PROPIO nombre, no del padre (un Domain agrupa varios reinos,
+            # no tiene un solo color uniforme que heredar).
+            child_kingdom = c["name"] if chain[0] == "kingdom" else kingdom
             if cid not in seen:
                 seen.add(cid)
-                nodes.append({"id": cid, "name": c["name"], "rank": chain[0], "key": c["key"], "kingdom": kingdom})
+                nodes.append({"id": cid, "name": c["name"], "rank": chain[0], "key": c["key"], "kingdom": child_kingdom})
             links.append({"source": center_id, "target": cid})
         # nivel 2
         if len(chain) > 1:
             lvl2_label, lvl2_keyprop = RANK_LABEL[chain[1]]
             lvl1_keys = [c["key"] for c in lvl1 if c.get("key") is not None]
+            lvl1_kingdom_by_key = {c["key"]: c["name"] for c in lvl1} if chain[0] == "kingdom" else None
             if lvl1_keys:
                 lvl2 = run_query(f"""
                     MATCH (p:{lvl1_label})-[:HAS_CHILD]->(c:{lvl2_label})
@@ -404,9 +422,12 @@ def graph_focus(rank: str, key: int, depth: int = 1):
                         continue
                     pid = f"{chain[0]}:{c['pkey']}"
                     cid = f"{chain[1]}:{c['key']}"
+                    # Mismo criterio: si el padre directo es Kingdom, el nieto hereda
+                    # el nombre de ESE kingdom padre (no el kingdom global del centro).
+                    grandchild_kingdom = lvl1_kingdom_by_key.get(c["pkey"], kingdom) if lvl1_kingdom_by_key else kingdom
                     if cid not in seen:
                         seen.add(cid)
-                        nodes.append({"id": cid, "name": c["name"], "rank": chain[1], "key": c["key"], "kingdom": kingdom})
+                        nodes.append({"id": cid, "name": c["name"], "rank": chain[1], "key": c["key"], "kingdom": grandchild_kingdom})
                     links.append({"source": pid, "target": cid})
 
     return {"nodes": nodes, "links": links, "center": center_id, "kingdom": kingdom}
