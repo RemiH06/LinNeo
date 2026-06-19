@@ -6,6 +6,10 @@ import DistributionMap, { isoToName } from '../components/DistributionMap'
 import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
+import ImageLightbox from '../components/ImageLightbox'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useNavigate } from 'react-router-dom'
+import '../theme/lightbox.css'
 
 const SOURCE_VARIANT = {
   wikipedia: 'arctic', powo: 'pine', fishbase: 'teal',
@@ -41,11 +45,14 @@ function ConservationBadge({ code, status }) {
 }
 
 export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
-  const { dark } = useTheme()
+  const { dark, toggle: toggleTheme } = useTheme()
   useSetKingdom(data?.kingdom)
+  const [lightbox, setLightbox] = useState(null) // { items, index } | null
+  useKeyboardShortcuts({ navigate, toggleTheme })
 
   useEffect(() => {
     let alive = true
@@ -241,7 +248,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
             <h3>Imagenes</h3>
             <div className="media-grid-side">
               {images.map((m, i) => (
-                <div key={i} className="media-thumb-lg" onClick={() => onOpenMedia?.({ type: 'image', items: images, index: i })} title="Abrir galeria">
+                <div key={i} className="media-thumb-lg" onClick={() => setLightbox({ items: images, index: i })} title="Abrir galeria">
                   <img src={m.url} alt={data.canonical_name} loading="lazy" />
                 </div>
               ))}
@@ -249,6 +256,15 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           </div>
         )}
       </aside>
+
+      {lightbox && (
+        <ImageLightbox
+          items={lightbox.items}
+          index={lightbox.index}
+          onClose={() => setLightbox(null)}
+          speciesName={data.canonical_name || data.scientific_name}
+        />
+      )}
     </div>
   )
 }

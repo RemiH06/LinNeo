@@ -8,6 +8,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import '../theme/bookworm.css'
 
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
@@ -113,7 +114,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const { dark } = useTheme()
+  const { dark, toggle: toggleTheme } = useTheme()
   useSetKingdom(data?.kingdom)
 
   // filtros de contenido (checkboxes)
@@ -187,6 +188,8 @@ export default function TaxonNode({ rank, nodeKey }) {
   const totalImages = children.reduce((s, c) => s + (c.flags?.images || 0), 0)
   const totalSounds = children.reduce((s, c) => s + (c.flags?.sounds || 0), 0)
   const totalDesc   = children.reduce((s, c) => s + (c.flags?.descriptions || 0), 0)
+
+  useKeyboardShortcuts({ navigate, toggleTheme, taxon: { filteredChildren, openChild } })
 
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
@@ -315,7 +318,9 @@ export default function TaxonNode({ rank, nodeKey }) {
 
               <div className="bw-children">
                 {filteredChildren.map((c, i) => (
-                  <div key={i} className="bw-child" onClick={() => openChild(c)}>
+                  <a key={i} className="bw-child"
+                    href={c.rank === 'species' ? `/species/${c.key}` : `/taxon/${c.rank}/${c.key}`}
+                    onClick={(e) => { e.preventDefault(); openChild(c) }}>
                     <div className="bw-child-info">
                       <div className="bw-rank">{RANK_ES[c.rank] || c.rank}</div>
                       <div style={{ fontStyle: c.rank === 'species' ? 'italic' : 'normal' }}>{c.name}</div>
@@ -326,7 +331,7 @@ export default function TaxonNode({ rank, nodeKey }) {
                         <img src={c.image} alt={c.name} loading="lazy" />
                       </div>
                     )}
-                  </div>
+                  </a>
                 ))}
               </div>
               {data.children.length === 0 && <p className="bw-muted">Sin hijos directos registrados.</p>}

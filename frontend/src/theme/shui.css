@@ -36,7 +36,7 @@ body.dark .shui-scope {
 .shui-scope .sh-topbar .theme-btn { flex-shrink: 0; }
 
 /* buscador */
-.shui-scope .sh-searchbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.shui-scope .sh-searchbar { position: relative; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .shui-scope .sh-input {
   flex: 1; min-width: 200px; font-family: var(--sh-mono); font-size: 14px; padding: 10px 14px;
   background: var(--sh-bg2); border: 1px solid var(--sh-border); border-radius: var(--sh-radius); color: var(--sh-text);
@@ -48,12 +48,26 @@ body.dark .shui-scope {
 }
 .shui-scope .sh-select:disabled { opacity: .45; cursor: not-allowed; }
 
-/* resultados de busqueda (dropdown) */
-.shui-scope .sh-results { background: var(--sh-bg2); border: 1px solid var(--sh-border); border-radius: var(--sh-radius); margin-top: 6px; max-height: 320px; overflow-y: auto; }
-.shui-scope .sh-result { padding: 8px 14px; cursor: pointer; border-bottom: 1px solid var(--sh-border); }
-.shui-scope .sh-result:hover { background: var(--sh-bg3); }
+/* resultados de busqueda (dropdown), flotando sobre el grafo sin empujar layout */
+.shui-scope .sh-results {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 20;
+  background: var(--sh-bg2); border: 1px solid var(--sh-border); border-radius: var(--sh-radius);
+  max-height: 360px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.shui-scope .sh-result {
+  padding: 8px 14px; cursor: pointer; border-bottom: 1px solid var(--sh-border);
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  text-decoration: none; color: inherit;
+}
+.shui-scope .sh-result:last-child { border-bottom: none; }
+.shui-scope .sh-result:hover, .shui-scope .sh-result.active { background: var(--sh-bg3); }
 .shui-scope .sh-result .sci { font-style: italic; }
 .shui-scope .sh-result .common { color: var(--sh-text2); font-size: 12px; }
+.shui-scope .sh-result .sh-swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; align-self: center; }
+.shui-scope .sh-result .sh-result-meta { color: var(--sh-text2); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-left: auto; flex-shrink: 0; }
+.shui-scope .sh-result-status { color: var(--sh-text2); font-size: 12px; cursor: default; }
+.shui-scope .sh-result-status:hover { background: transparent; }
+.shui-scope .sh-match { background: var(--sh-accent); color: var(--sh-bg); border-radius: 2px; padding: 0 1px; font-style: normal; }
 
 /* grafo central */
 .shui-scope .sh-graph-wrap { flex: 1; position: relative; min-height: 200px; }
@@ -92,7 +106,7 @@ body.dark .shui-scope {
   position: relative; flex: 1; min-width: 120px; height: 110px; border-radius: 10px;
   cursor: pointer; border: 1px solid var(--sh-border); background: var(--sh-bg2);
   display: flex; align-items: center; justify-content: center; text-align: center;
-  transition: border-color .2s, box-shadow .2s;
+  transition: border-color .2s, box-shadow .2s; text-decoration: none; color: inherit;
 }
 .shui-scope .sh-kbox:hover {
   border-color: var(--kbox-glow, var(--sh-accent));

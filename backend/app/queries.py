@@ -37,6 +37,56 @@ def search_by_name(term: str, limit: int = 25):
     return run_query(cypher, {"q": q, "limit": limit})
 
 
+def search_clades(term: str, limit_per_group: int = 100):
+    """
+    Busca `term` (contiene, case-insensitive) en TODOS los rangos taxonomicos
+    (domain..species), agrupado por rango + reino. Para species, prioriza los
+    que tienen nombre comun. Limita a `limit_per_group` por cada combinacion
+    rango+reino para no devolver listas gigantes con terminos muy genericos.
+    """
+    t = term.strip().lower()
+    if not t:
+        return {}
+    results = {}
+    for rank, (label, keyprop) in RANK_LABEL.items():
+        if rank == "species":
+            cypher = f"""
+            MATCH (n:{label})
+            WHERE toLower(coalesce(n.canonical_name, n.scientific_name, '')) CONTAINS $t
+            WITH n, size(coalesce(n.commonNames, [])) > 0 AS has_common
+            ORDER BY has_common DESC, coalesce(n.canonical_name, n.scientific_name)
+            WITH n.kingdom AS kingdom, collect({{
+                name: coalesce(n.canonical_name, n.scientific_name),
+                key: n.{keyprop},
+                rank: '{rank}',
+                kingdom: n.kingdom,
+                common_names: n.commonNames
+            }})[0..{limit_per_group}] AS items
+            WHERE size(items) > 0
+            RETURN kingdom, items
+            """
+        else:
+            group_expr = "n.name" if rank == "kingdom" else "n.kingdom"
+            cypher = f"""
+            MATCH (n:{label})
+            WHERE toLower(coalesce(n.canonical_name, n.name, n.scientific_name, '')) CONTAINS $t
+            WITH n
+            ORDER BY coalesce(n.canonical_name, n.name, n.scientific_name)
+            WITH {group_expr} AS kingdom, collect({{
+                name: coalesce(n.canonical_name, n.name, n.scientific_name),
+                key: n.{keyprop},
+                rank: '{rank}',
+                kingdom: {group_expr}
+            }})[0..{limit_per_group}] AS items
+            WHERE size(items) > 0
+            RETURN kingdom, items
+            """
+        rows = run_query(cypher, {"t": t})
+        if rows:
+            results[rank] = rows
+    return results
+
+
 def search_in_descriptions(term: str, limit: int = 25):
     cypher = """
     CALL db.index.fulltext.queryNodes('description_text', $q)

@@ -1,0 +1,79 @@
+/* ============================================================
+   LinNeo -- ImageLightbox
+   Overlay de imagen con zoom, pan, cuentagotas y galeria.
+============================================================ */
+
+.lb-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(18px) saturate(0.6);
+  -webkit-backdrop-filter: blur(18px) saturate(0.6);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* escenario: contiene la imagen, absorbe eventos de zoom/pan */
+.lb-stage {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+.lb-image {
+  max-width: 90vw; max-height: 88vh;
+  object-fit: contain;
+  transform-origin: center center;
+  transition: transform 0.05s linear;
+  pointer-events: auto;
+  border-radius: 4px;
+  box-shadow: 0 8px 48px rgba(0,0,0,.7);
+}
+
+/* controles superiores */
+.lb-controls {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; z-index: 10001;
+  background: rgba(0,0,0,.55); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 6px; padding: 6px 10px;
+  font-family: 'Iosevka', ui-monospace, monospace;
+}
+.lb-btn {
+  font-family: inherit; font-size: 14px; padding: 4px 10px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  border-radius: 4px; color: rgba(255,255,255,.85); cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.lb-btn:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
+.lb-btn.active { background: rgba(255,255,255,.25); border-color: rgba(255,255,255,.6); color: #fff; }
+.lb-close { margin-left: 8px; color: rgba(255,100,100,.85); }
+.lb-close:hover { background: rgba(200,50,50,.25); border-color: rgba(255,100,100,.5); }
+
+.lb-color-preview {
+  font-size: 12px; color: rgba(255,255,255,.8);
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  border-radius: 4px; padding: 4px 10px; white-space: nowrap;
+}
+.lb-copy-msg {
+  font-size: 11px; color: rgba(80,255,160,.9);
+  padding: 4px 8px; white-space: nowrap;
+}
+
+/* flechas de galeria */
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 10001;
+  font-size: 36px; padding: 12px 18px;
+  background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 4px; color: rgba(255,255,255,.8); cursor: pointer;
+  transition: background .15s;
+}
+.lb-nav:hover { background: rgba(255,255,255,.15); }
+.lb-prev { left: 16px; }
+.lb-next { right: 16px; }
+
+/* contador galeria */
+.lb-counter {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+  font-family: 'Iosevka', ui-monospace, monospace; font-size: 12px;
+  color: rgba(255,255,255,.6); background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 4px; padding: 4px 12px;
+  z-index: 10001;
+}

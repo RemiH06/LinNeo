@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { KINGDOM_HUE } from '../theme/kingdomColor'
 import ThemeToggle from '../components/ThemeToggle'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import '../theme/shui.css'
 
 function glowFor(kingdom, dark) {
@@ -20,6 +21,25 @@ function swatchFor(kingdom, dark) {
   const h = KINGDOM_HUE[kingdom]
   const gray = (kingdom === 'incertae sedis' || h == null)
   return `hsl(${gray ? 210 : h}, ${gray ? 12 : 80}%, ${dark ? 55 : 45}%)`
+}
+
+const RANK_ES_SHORT = {
+  domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase',
+  order: 'Orden', family: 'Familia', genus: 'Genero', species: 'Especie',
+}
+
+// Resalta la subcadena de `text` que coincide con `query` (case-insensitive).
+function highlightMatch(text, query) {
+  if (!query) return text
+  const idx = text.toLowerCase().indexOf(query.toLowerCase())
+  if (idx === -1) return text
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="sh-match">{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  )
 }
 
 // Reinos activos por defecto (el resto arranca desmarcado)
@@ -40,7 +60,7 @@ function deriveDomainGroups(full) {
 
 export default function Shui() {
   const navigate = useNavigate()
-  const { dark } = useTheme()
+  const { dark, toggle: toggleTheme } = useTheme()
 
   const [graphData, setGraphData] = useState(null)
   const [focusKingdom, setFocusKingdom] = useState(null)
@@ -54,7 +74,12 @@ export default function Shui() {
   // buscador
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState(false)
+  const [activeIdx, setActiveIdx] = useState(-1)
   const searchTimer = useRef(null)
+  const searchRef = useRef(null)
+  const resultsWrapRef = useRef(null)
 
   // filtros geograficos (barra derecha)
   const [continents, setContinents] = useState([])
@@ -167,11 +192,68 @@ export default function Shui() {
 
   function onSearch(value) {
     setQ(value)
+    setActiveIdx(-1)
     clearTimeout(searchTimer.current)
-    if (!value.trim()) { setResults([]); return }
+    if (!value.trim()) { setResults([]); setSearchError(false); return }
     searchTimer.current = setTimeout(() => {
-      api.search(value.trim(), 15).then((rows) => setResults(rows || [])).catch(() => setResults([]))
+      setSearchLoading(true); setSearchError(false)
+      api.searchClades(value.trim(), 8)
+        .then((data) => {
+          // aplanar { groups: { rank: [{kingdom, items}] } } a una lista plana
+          // de sugerencias, manteniendo rank/kingdom para mostrar contexto.
+          const flat = []
+          const groups = data?.groups || {}
+          for (const rank of Object.keys(groups)) {
+            for (const g of groups[rank]) {
+              for (const item of g.items) flat.push(item)
+            }
+          }
+          setResults(flat)
+          setSearchLoading(false)
+        })
+        .catch(() => { setResults([]); setSearchError(true); setSearchLoading(false) })
     }, 250)
+  }
+
+  function resultHref(r) {
+    return r.rank === 'species' ? `/species/${r.key}` : `/taxon/${r.rank}/${r.key}`
+  }
+  function openResult(r) {
+    navigate(resultHref(r))
+    setResults([]); setQ(''); setActiveIdx(-1)
+  }
+
+  function onSearchKeyDown(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIdx((i) => Math.min(i + 1, results.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIdx((i) => Math.max(i - 1, -1))
+      return
+    }
+    if (e.key === 'Escape') {
+      setResults([]); setActiveIdx(-1)
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const query = q.trim()
+      if (!query) return
+      // si hay una sugerencia resaltada con las flechas, esa manda
+      if (activeIdx >= 0 && results[activeIdx]) {
+        openResult(results[activeIdx])
+        return
+      }
+      // si alguna sugerencia coincide EXACTO (case-insensitive) con lo escrito,
+      // se abre directo; si no, se va a la vista de resultados de busqueda.
+      const exact = results.find((r) => r.name?.toLowerCase() === query.toLowerCase())
+      if (exact) { openResult(exact); return }
+      navigate(`/search?q=${encodeURIComponent(query)}`)
+      setResults([]); setActiveIdx(-1)
+    }
   }
 
   function onContinent(value) {
@@ -190,6 +272,43 @@ export default function Shui() {
     focusOn(null)
   }
 
+  function selectAllKingdoms() {
+    setActiveKingdoms(new Set(kingdoms.map((k) => k.name)))
+  }
+  function deselectAllKingdoms() {
+    setActiveKingdoms(new Set())
+  }
+  function navigateToList() {
+    if (focusNode) navigate(`/taxon/${focusNode.rank}/${focusNode.key}`)
+  }
+
+  useKeyboardShortcuts({
+    navigate,
+    toggleTheme,
+    shui: {
+      searchRef,
+      resetAll,
+      reloadExamples: () => focusNode
+        ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples)
+        : loadKingdomExamples(),
+      openDrawer,
+      navigateToList,
+      selectAllKingdoms,
+      deselectAllKingdoms,
+    },
+  })
+
+  // cerrar el dropdown de sugerencias al hacer clic fuera
+  useEffect(() => {
+    function onClickOutside(e) {
+      if (resultsWrapRef.current && !resultsWrapRef.current.contains(e.target)) {
+        setResults([]); setActiveIdx(-1)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
   return (
     <div className="shui-scope">
       <ShuiBackground />
@@ -204,23 +323,37 @@ export default function Shui() {
         <div className="sh-top">
           <div className="sh-topbar">
             <div className="sh-title">LinNeo<span>_</span></div>
-            <div className="sh-searchbar">
-              <input className="sh-input" value={q} onChange={(e) => onSearch(e.target.value)}
+            <div className="sh-searchbar" ref={resultsWrapRef}>
+              <input ref={searchRef} className="sh-input" value={q}
+                onChange={(e) => onSearch(e.target.value)}
+                onKeyDown={onSearchKeyDown}
                 placeholder="Buscar por nombre comun o cientifico..." />
+              {(q.trim().length > 0) && (
+                <div className="sh-results">
+                  {searchLoading && <div className="sh-result sh-result-status">Buscando...</div>}
+                  {!searchLoading && searchError && <div className="sh-result sh-result-status">Error al buscar.</div>}
+                  {!searchLoading && !searchError && results.length === 0 && (
+                    <div className="sh-result sh-result-status">Sin resultados. Enter para ver clados que contengan "{q.trim()}".</div>
+                  )}
+                  {!searchLoading && !searchError && results.map((r, i) => (
+                    <a key={`${r.rank}:${r.key}`} className={`sh-result ${i === activeIdx ? 'active' : ''}`}
+                      href={resultHref(r)}
+                      onClick={(e) => { e.preventDefault(); openResult(r) }}
+                      onMouseEnter={() => setActiveIdx(i)}>
+                      <span className="sh-swatch" style={{ background: swatchFor(r.kingdom, dark) }} />
+                      <span className="sci">{highlightMatch(r.name, q.trim())}</span>
+                      <span className="sh-result-meta">
+                        {RANK_ES_SHORT[r.rank] || r.rank}{r.kingdom ? ` · ${r.kingdom}` : ''}
+                      </span>
+                      {r.common_names?.length > 0 && <span className="common"> - {r.common_names.slice(0, 3).join(', ')}</span>}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
             <button className="sh-kbtn" onClick={resetAll}>Reiniciar</button>
             <ThemeToggle />
           </div>
-          {results.length > 0 && (
-            <div className="sh-results">
-              {results.map((r) => (
-                <div key={r.species_key} className="sh-result" onClick={() => navigate(`/species/${r.species_key}`)}>
-                  <span className="sci">{r.canonical_name || r.scientific_name}</span>
-                  {r.common_names?.length > 0 && <span className="common"> - {r.common_names.slice(0, 3).join(', ')}</span>}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Cuerpo: barra izquierda + grafo + barra derecha */}
@@ -313,12 +446,14 @@ export default function Shui() {
                 <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
               )}
               {!exLoading && !exError && examples.map((ex, i) => (
-                <div key={ex.species_key || i} className="sh-kbox"
+                <a key={ex.species_key || i} className="sh-kbox"
                   style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
-                  onClick={() => navigate(`/species/${ex.species_key}`)} title={ex.name}>
+                  href={`/species/${ex.species_key}`}
+                  onClick={(e) => { e.preventDefault(); navigate(`/species/${ex.species_key}`) }}
+                  title={ex.name}>
                   {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
                   <span className="label">{ex.name}</span>
-                </div>
+                </a>
               ))}
             </div>
             <div className="sh-kbar-actions">

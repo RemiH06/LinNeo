@@ -34,6 +34,7 @@ body.dark .bookworm-scope {
   background: var(--bw-bg2); border: 1px solid var(--bw-border); border-left: 3px solid var(--bw-moss);
   border-radius: var(--bw-radius); padding: 10px 14px; cursor: pointer; transition: all .15s; font-size: 14px;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  text-decoration: none; color: inherit;
 }
 .bookworm-scope .bw-child:hover { border-left-color: var(--bw-amber); transform: translateX(2px); }
 .bookworm-scope .bw-child-info { min-width: 0; flex: 1; }
@@ -88,3 +89,13 @@ body.dark .bookworm-scope {
 
 /* Lista a ancho completo */
 .bookworm-scope .bw-list-section { border-top: 1px solid var(--bw-border); padding-top: 20px; }
+
+/* ── SearchResults ── */
+.bookworm-scope .sr-searchbar { display: flex; gap: 8px; margin: 16px 0 8px; }
+.bookworm-scope .sr-input {
+  flex: 1; font-family: var(--bw-serif); font-size: 14px; padding: 9px 14px;
+  background: var(--bw-bg2); border: 1px solid var(--bw-border); border-radius: var(--bw-radius); color: var(--bw-text);
+}
+.bookworm-scope .sr-input:focus { outline: none; border-color: var(--bw-accent); }
+.bookworm-scope .sr-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.bookworm-scope .sr-card { padding: 8px 12px; font-size: 13px; }

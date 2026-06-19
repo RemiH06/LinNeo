@@ -1,5 +1,4 @@
 const API_BASE = import.meta.env.VITE_API_BASE || '/api'
-
 async function get(path) {
   const res = await fetch(`${API_BASE}${path}`)
   if (!res.ok) {
@@ -8,10 +7,10 @@ async function get(path) {
   }
   return res.json()
 }
-
 export const api = {
   stats: () => get('/stats'),
   search: (q, limit = 25) => get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  searchClades: (q, limitPerGroup = 100) => get(`/search/clades?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}`),
   searchDescription: (q, limit = 25) => get(`/search/description?q=${encodeURIComponent(q)}&limit=${limit}`),
   species: (key) => get(`/species/${key}`),
   taxon: (rank, key) => get(`/taxon/${rank}/${key}`),
@@ -30,7 +29,6 @@ export const api = {
   continents: () => get('/continents'),
   countries: (continent) => get(`/continents/${encodeURIComponent(continent)}/countries`),
 }
-
 // Paleta y etiquetas de los tipos de presencia (establishment_means)
 export const ESTABLISHMENT = {
   native:      { color: '#00E8D8', label: 'Nativo' },
@@ -41,7 +39,6 @@ export const ESTABLISHMENT = {
   uncertain:   { color: '#7090C0', label: 'Incierto' },
   '':          { color: '#4D8FFF', label: 'Presente (sin clasificar)' },
 }
-
 // Estados IUCN: codigo -> {label, color}
 export const IUCN = {
   LC: { label: 'Preocupacion menor', color: '#00F090' },

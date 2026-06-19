@@ -56,6 +56,19 @@ def search(
     return {"query": q, "results": queries.search_by_name(q, limit)}
 
 
+@app.get("/search/clades")
+def search_clades(
+    q: str = Query(..., min_length=1, description="Cadena a buscar en todos los rangos"),
+    limit_per_group: int = Query(100, ge=1, le=200),
+):
+    """
+    Busca `q` (contiene, sin importar mayusculas) en todos los rangos
+    taxonomicos (domain..species), agrupado por rango y reino. Usado por la
+    vista de resultados de busqueda en Shui cuando no hay match exacto.
+    """
+    return {"query": q, "groups": queries.search_clades(q, limit_per_group)}
+
+
 @app.get("/search/description")
 def search_description(
     q: str = Query(..., min_length=3, description="Texto a buscar en descripciones"),
@@ -108,7 +121,7 @@ def kingdoms():
 
 @app.get("/graph")
 def graph():
-    """Grafo inicial: Biota -> reinos -> filos."""
+    """Grafo inicial: Biota -> dominios -> reinos."""
     return queries.graph_default()
 
 
@@ -142,7 +155,5 @@ def continents():
 def continent_countries(continent: str):
     return queries.countries_in_continent(continent)
 
-#? No sé qué le pasó al main pero ya no muestra las cosas como deberían estar.
-#! El color en los nodos del grafo taxonómico desapareció, corrígelo
 #* Fue un día productivo, por favor vete a dormir.
 # TODO dormir
