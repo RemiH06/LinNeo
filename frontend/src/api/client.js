@@ -10,7 +10,8 @@ async function get(path) {
 export const api = {
   stats: () => get('/stats'),
   search: (q, limit = 25) => get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
-  searchClades: (q, limitPerGroup = 100) => get(`/search/clades?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}`),
+  searchClades: (q, limitPerGroup = 100, mode = 'contains') => get(`/search/clades?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}&mode=${mode}`),
+  searchCladesByRank: (rank, q, limitPerGroup = 100, mode = 'contains') => get(`/search/clades/${rank}?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}&mode=${mode}`),
   searchDescription: (q, limit = 25) => get(`/search/description?q=${encodeURIComponent(q)}&limit=${limit}`),
   species: (key) => get(`/species/${key}`),
   taxon: (rank, key) => get(`/taxon/${rank}/${key}`),

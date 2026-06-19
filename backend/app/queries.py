@@ -37,51 +37,98 @@ def search_by_name(term: str, limit: int = 25):
     return run_query(cypher, {"q": q, "limit": limit})
 
 
-def search_clades(term: str, limit_per_group: int = 100):
+def search_clades_by_rank(term: str, rank: str, limit_per_group: int = 100, mode: str = "contains"):
     """
-    Busca `term` (contiene, case-insensitive) en TODOS los rangos taxonomicos
-    (domain..species), agrupado por rango + reino. Para species, prioriza los
-    que tienen nombre comun. Limita a `limit_per_group` por cada combinacion
-    rango+reino para no devolver listas gigantes con terminos muy genericos.
+    Busca `term` en UN solo rango taxonomico, agrupado por reino. Para
+    species: prioriza los que tienen nombre comun y agrega flags de
+    contenido (imagenes/sonidos/descripciones/nombre comun), igual patron
+    que get_taxon_node, para que las tarjetas de resultados puedan mostrar
+    sellos sin pedir cada especie por separado.
+    Para los demas rangos NO se agregan flags (queries mas ligeras: recorrer
+    HAS_CHILD* de todos los descendientes seria costoso y no se pidio).
+
+    mode:
+      'contains' -- el nombre contiene `term` en cualquier posicion (default)
+      'starts'   -- el nombre EMPIEZA con `term`. Para species, el genero es
+                    siempre la primera palabra del nombre cientifico, asi que
+                    se evalua sobre la SEGUNDA palabra (epiteto), igual patron
+                    que el filtro alfabetico de TaxonNode. Para los demas
+                    rangos se evalua el nombre completo.
+    """
+    t = term.strip().lower()
+    if not t or rank not in RANK_LABEL:
+        return []
+    label, keyprop = RANK_LABEL[rank]
+    starts = mode == "starts"
+
+    if rank == "species":
+        # split(name,' ')[1] = epiteto (2da palabra); si el nombre solo tiene
+        # una palabra (raro, pero posible con datos sucios), usar esa misma.
+        match_clause = (
+            "WITH n, CASE WHEN size(split(coalesce(n.canonical_name, n.scientific_name, ''), ' ')) > 1 "
+            "THEN split(coalesce(n.canonical_name, n.scientific_name, ''), ' ')[1] "
+            "ELSE coalesce(n.canonical_name, n.scientific_name, '') END AS epithet "
+            "WHERE toLower(epithet) STARTS WITH $t"
+            if starts else
+            "WHERE toLower(coalesce(n.canonical_name, n.scientific_name, '')) CONTAINS $t"
+        )
+        cypher = f"""
+        MATCH (n:{label})
+        {match_clause}
+        OPTIONAL MATCH (n)-[:HAS_MEDIA]->(mi:Media) WHERE mi.media_type = 'image'
+        OPTIONAL MATCH (n)-[:HAS_MEDIA]->(ms:Media) WHERE ms.media_type = 'sound'
+        OPTIONAL MATCH (n)-[:HAS_DESCRIPTION]->(d:Description)
+        WITH n, count(DISTINCT mi) AS n_img, count(DISTINCT ms) AS n_snd, count(DISTINCT d) AS n_desc,
+             size(coalesce(n.commonNames, [])) > 0 AS has_common
+        ORDER BY has_common DESC, coalesce(n.canonical_name, n.scientific_name)
+        WITH n.kingdom AS kingdom, collect({{
+            name: coalesce(n.canonical_name, n.scientific_name),
+            key: n.{keyprop},
+            rank: '{rank}',
+            kingdom: n.kingdom,
+            common_names: n.commonNames,
+            flags: {{images: n_img, sounds: n_snd, descriptions: n_desc}}
+        }})[0..{limit_per_group}] AS items
+        WHERE size(items) > 0
+        RETURN kingdom, items
+        """
+    else:
+        group_expr = "n.name" if rank == "kingdom" else "n.kingdom"
+        name_expr = "coalesce(n.canonical_name, n.name, n.scientific_name, '')"
+        where_clause = (
+            f"WHERE toLower({name_expr}) STARTS WITH $t" if starts
+            else f"WHERE toLower({name_expr}) CONTAINS $t"
+        )
+        cypher = f"""
+        MATCH (n:{label})
+        {where_clause}
+        WITH n
+        ORDER BY coalesce(n.canonical_name, n.name, n.scientific_name)
+        WITH {group_expr} AS kingdom, collect({{
+            name: coalesce(n.canonical_name, n.name, n.scientific_name),
+            key: n.{keyprop},
+            rank: '{rank}',
+            kingdom: {group_expr}
+        }})[0..{limit_per_group}] AS items
+        WHERE size(items) > 0
+        RETURN kingdom, items
+        """
+    return run_query(cypher, {"t": t})
+
+
+def search_clades(term: str, limit_per_group: int = 100, mode: str = "contains"):
+    """
+    Busca `term` en TODOS los rangos a la vez (usado por callers que prefieren
+    una sola respuesta consolidada). Internamente llama a
+    search_clades_by_rank por cada rango. El endpoint /search/clades/{rank}
+    expone la version per-rank para busquedas progresivas desde el frontend.
     """
     t = term.strip().lower()
     if not t:
         return {}
     results = {}
-    for rank, (label, keyprop) in RANK_LABEL.items():
-        if rank == "species":
-            cypher = f"""
-            MATCH (n:{label})
-            WHERE toLower(coalesce(n.canonical_name, n.scientific_name, '')) CONTAINS $t
-            WITH n, size(coalesce(n.commonNames, [])) > 0 AS has_common
-            ORDER BY has_common DESC, coalesce(n.canonical_name, n.scientific_name)
-            WITH n.kingdom AS kingdom, collect({{
-                name: coalesce(n.canonical_name, n.scientific_name),
-                key: n.{keyprop},
-                rank: '{rank}',
-                kingdom: n.kingdom,
-                common_names: n.commonNames
-            }})[0..{limit_per_group}] AS items
-            WHERE size(items) > 0
-            RETURN kingdom, items
-            """
-        else:
-            group_expr = "n.name" if rank == "kingdom" else "n.kingdom"
-            cypher = f"""
-            MATCH (n:{label})
-            WHERE toLower(coalesce(n.canonical_name, n.name, n.scientific_name, '')) CONTAINS $t
-            WITH n
-            ORDER BY coalesce(n.canonical_name, n.name, n.scientific_name)
-            WITH {group_expr} AS kingdom, collect({{
-                name: coalesce(n.canonical_name, n.name, n.scientific_name),
-                key: n.{keyprop},
-                rank: '{rank}',
-                kingdom: {group_expr}
-            }})[0..{limit_per_group}] AS items
-            WHERE size(items) > 0
-            RETURN kingdom, items
-            """
-        rows = run_query(cypher, {"t": t})
+    for rank in RANK_LABEL:
+        rows = search_clades_by_rank(term, rank, limit_per_group, mode)
         if rows:
             results[rank] = rows
     return results

@@ -60,13 +60,32 @@ def search(
 def search_clades(
     q: str = Query(..., min_length=1, description="Cadena a buscar en todos los rangos"),
     limit_per_group: int = Query(100, ge=1, le=200),
+    mode: str = Query("contains", description="contains o starts"),
 ):
     """
-    Busca `q` (contiene, sin importar mayusculas) en todos los rangos
-    taxonomicos (domain..species), agrupado por rango y reino. Usado por la
-    vista de resultados de busqueda en Shui cuando no hay match exacto.
+    Busca `q` en todos los rangos taxonomicos (domain..species), agrupado por
+    rango y reino. mode='contains' (default) o 'starts' (empieza con; para
+    species se evalua sobre el epiteto, 2da palabra del nombre).
     """
-    return {"query": q, "groups": queries.search_clades(q, limit_per_group)}
+    mode = mode if mode in ("contains", "starts") else "contains"
+    return {"query": q, "groups": queries.search_clades(q, limit_per_group, mode)}
+
+
+@app.get("/search/clades/{rank}")
+def search_clades_by_rank(
+    rank: str,
+    q: str = Query(..., min_length=1, description="Cadena a buscar en este rango"),
+    limit_per_group: int = Query(100, ge=1, le=200),
+    mode: str = Query("contains", description="contains o starts"),
+):
+    """
+    Version per-rango de /search/clades: busca `q` solo en el rango indicado,
+    agrupado por reino. Permite que el frontend dispare 8 llamadas paralelas
+    (una por rango) y renderice cada grupo en cuanto su respuesta llega, en
+    vez de esperar a que el rango mas lento termine.
+    """
+    mode = mode if mode in ("contains", "starts") else "contains"
+    return {"query": q, "rank": rank, "groups": queries.search_clades_by_rank(q, rank, limit_per_group, mode)}
 
 
 @app.get("/search/description")

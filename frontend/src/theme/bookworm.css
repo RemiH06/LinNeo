@@ -72,6 +72,21 @@ body.dark .bookworm-scope {
 .bookworm-scope .bw-header { margin-top: 18px; margin-bottom: 20px; }
 .bookworm-scope .bw-header-title h1 { margin: 2px 0 4px; }
 
+/* header de SearchResults: titulo+contador a la izquierda, filtros a la derecha */
+.bookworm-scope .sr-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+.bookworm-scope .sr-filters { margin: 0; flex-wrap: wrap; }
+.bookworm-scope .sr-timer { font-family: var(--bw-mono); color: var(--bw-accent2); }
+
+/* toggle segmentado contiene/empieza con */
+.bookworm-scope .sr-mode-toggle { display: inline-flex; border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; }
+.bookworm-scope .sr-mode-btn {
+  font-family: var(--bw-mono); font-size: 11px; padding: 6px 12px; border: none;
+  background: var(--bw-bg2); color: var(--bw-text2); cursor: pointer; transition: all .15s;
+}
+.bookworm-scope .sr-mode-btn + .sr-mode-btn { border-left: 1px solid var(--bw-border); }
+.bookworm-scope .sr-mode-btn:hover { color: var(--bw-accent); }
+.bookworm-scope .sr-mode-btn.active { background: var(--bw-accent); color: var(--bw-bg); }
+
 /* Stats de contenido del taxon */
 .bookworm-scope .bw-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
 .bookworm-scope .bw-stat { display: flex; flex-direction: column; align-items: center; min-width: 54px; }

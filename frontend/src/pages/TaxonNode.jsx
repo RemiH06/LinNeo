@@ -64,7 +64,7 @@ function AggregateMap({ countries, onSelectCountry, activeCountry, activeContine
 
 // Sellos de contenido disponible para un hijo (especie o taxon superior).
 // Para especie: cuenta su propio contenido. Para taxon: cuantas especies descendientes lo tienen.
-function ContentFlags({ flags, isSpecies, conservation, commonNames }) {
+export function ContentFlags({ flags, isSpecies, conservation, commonNames }) {
   if (!flags) return null
   const items = []
   const Seal = ({ title, icon, n, color }) => (
