@@ -588,3 +588,105 @@ def countries_in_continent(continent: str):
     RETURN c.key AS key, c.name AS name ORDER BY name
     """
     return run_query(cypher, {"cont": continent})
+
+
+def get_continent_node(continent: str):
+    """
+    Vista de un continente: lista de sus paises, cada uno con el numero de
+    especies presentes (FOUND_IN) para que la tarjeta muestre algo de
+    contexto. No se agregan flags de contenido aqui (seria un agregado de
+    TODAS las especies de TODOS los paises, demasiado caro); eso se calcula
+    al entrar a un pais especifico via get_country_node.
+    """
+    cypher = """
+    MATCH (co:Country)-[:PART_OF]->(cont:Continent {name: $cont})
+    OPTIONAL MATCH (s:Species)-[:FOUND_IN]->(co)
+    WITH co, count(DISTINCT s) AS n_species
+    ORDER BY co.name
+    RETURN collect({
+        name: co.name,
+        key: co.key,
+        rank: 'country',
+        species_count: n_species
+    }) AS countries
+    """
+    rows = run_query(cypher, {"cont": continent})
+    if not rows:
+        return None
+    return {"name": continent, "rank": "continent", "countries": rows[0]["countries"]}
+
+
+def get_country_node(country_code: str, child_limit: int = 500):
+    """
+    Vista de un pais: especies presentes (FOUND_IN), con el mismo shape de
+    flags/image/common_names que get_taxon_node, para que la lista de
+    resultados se sienta igual que la de un taxon. Tambien agrega el desglose
+    por reino (cuantas especies de cada kingdom hay en el pais), util para
+    mostrar contexto sin tener que abrir cada especie.
+    """
+    code = (country_code or "").strip().upper()
+    if not code:
+        return None
+
+    name_cypher = """
+    MATCH (co:Country {key: $code})
+    OPTIONAL MATCH (co)-[:PART_OF]->(cont:Continent)
+    RETURN co.name AS name, cont.name AS continent
+    LIMIT 1
+    """
+    nrows = run_query(name_cypher, {"code": code})
+    if not nrows or not nrows[0].get("name"):
+        return None
+
+    species_cypher = """
+    MATCH (s:Species)-[:FOUND_IN]->(co:Country {key: $code})
+    WITH s
+    ORDER BY coalesce(s.canonical_name, s.scientific_name)
+    LIMIT $climit
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(mi:Media) WHERE mi.media_type = 'image'
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(ms:Media) WHERE ms.media_type = 'sound'
+    OPTIONAL MATCH (s)-[:HAS_DESCRIPTION]->(d:Description)
+    WITH s,
+         count(DISTINCT mi) AS n_img,
+         count(DISTINCT ms) AS n_snd,
+         count(DISTINCT d)  AS n_desc,
+         head(collect(DISTINCT mi.url)) AS image
+    RETURN collect({
+        name: coalesce(s.canonical_name, s.scientific_name),
+        key: s.species_key,
+        rank: 'species',
+        kingdom: s.kingdom,
+        conservation: s.conservation_overall_code,
+        image: image,
+        common_names: s.commonNames,
+        flags: {images: n_img, sounds: n_snd, descriptions: n_desc}
+    }) AS species
+    """
+    srows = run_query(species_cypher, {"code": code, "climit": child_limit})
+    species = srows[0]["species"] if srows else []
+
+    kingdom_cypher = """
+    MATCH (s:Species)-[:FOUND_IN]->(co:Country {key: $code})
+    WHERE s.kingdom IS NOT NULL
+    RETURN s.kingdom AS kingdom, count(DISTINCT s) AS n
+    ORDER BY n DESC
+    """
+    kingdom_rows = run_query(kingdom_cypher, {"code": code})
+
+    total_cypher = """
+    MATCH (s:Species)-[:FOUND_IN]->(co:Country {key: $code})
+    RETURN count(DISTINCT s) AS total
+    """
+    total_rows = run_query(total_cypher, {"code": code})
+    total = total_rows[0]["total"] if total_rows else 0
+
+    return {
+        "name": nrows[0]["name"],
+        "key": code,
+        "rank": "country",
+        "continent": nrows[0].get("continent"),
+        "species_count": total,
+        "by_kingdom": kingdom_rows,
+        "children": species,
+        "child_rank": "species",
+    }

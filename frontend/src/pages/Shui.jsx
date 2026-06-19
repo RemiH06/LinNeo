@@ -81,12 +81,6 @@ export default function Shui() {
   const searchRef = useRef(null)
   const resultsWrapRef = useRef(null)
 
-  // filtros geograficos (barra derecha)
-  const [continents, setContinents] = useState([])
-  const [countries, setCountries] = useState([])
-  const [continent, setContinent] = useState('')
-  const [country, setCountry] = useState('')
-
   // barra inferior (cajon deslizable)
   const [examples, setExamples] = useState([])
   const [exLoading, setExLoading] = useState(true)
@@ -107,7 +101,6 @@ export default function Shui() {
 
   useEffect(() => {
     api.graph().then((g) => { setGraphData(g); setFullGraph(g); setDomainGroups(deriveDomainGroups(g)) }).catch(() => {})
-    api.continents().then(setContinents).catch(() => {})
     api.kingdoms().then((ks) => {
       setKingdoms(ks)
       const names = ks.map((k) => k.name)
@@ -256,17 +249,8 @@ export default function Shui() {
     }
   }
 
-  function onContinent(value) {
-    setContinent(value); setCountry(''); setCountries([])
-    if (value) api.countries(value).then(setCountries).catch(() => setCountries([]))
-  }
-  function applyCountryFilter() {
-    if (!country) return
-    api.filter({ country }).then((res) => setResults(res.results || [])).catch(() => setResults([]))
-  }
-
   function resetAll() {
-    setQ(''); setResults([]); setContinent(''); setCountry(''); setCountries([])
+    setQ(''); setResults([])
     const names = kingdoms.map((k) => k.name)
     setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
     focusOn(null)
@@ -397,20 +381,16 @@ export default function Shui() {
             </div>
           </div>
 
-          {/* Derecha: geografia */}
+          {/* Derecha: geografia + vista */}
           <aside className="sh-side right">
             <h3>Geografia</h3>
-            <label className="sh-fieldlabel">Continente</label>
-            <select className="sh-select" style={{ width: '100%' }} value={continent} onChange={(e) => onContinent(e.target.value)}>
-              <option value="">Todos</option>
-              {continents.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <label className="sh-fieldlabel">Pais</label>
-            <select className="sh-select" style={{ width: '100%' }} value={country} onChange={(e) => setCountry(e.target.value)} disabled={!continent}>
-              <option value="">Todos</option>
-              {countries.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
-            </select>
-            <button className="sh-kbtn" style={{ width: '100%', marginTop: 10 }} onClick={applyCountryFilter} disabled={!country}>Filtrar especies</button>
+            <button
+              className="sh-kbtn"
+              style={{ width: '100%' }}
+              onClick={() => navigate('/map')}
+            >
+              Ver en mapa
+            </button>
 
             <h3 style={{ marginTop: 22 }}>Vista</h3>
             <button

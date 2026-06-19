@@ -174,5 +174,24 @@ def continents():
 def continent_countries(continent: str):
     return queries.countries_in_continent(continent)
 
+
+@app.get("/map/continent/{continent}")
+def map_continent(continent: str):
+    """Vista de un continente: sus paises, cada uno con su conteo de especies."""
+    node = queries.get_continent_node(continent)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Continente no encontrado")
+    return node
+
+
+@app.get("/map/country/{code}")
+def map_country(code: str):
+    """Vista de un pais: especies presentes, con el mismo shape que /taxon."""
+    node = queries.get_country_node(code)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Pais no encontrado")
+    return node
+
+
 #* Fue un día productivo, por favor vete a dormir.
 # TODO dormir

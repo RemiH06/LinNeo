@@ -36,6 +36,7 @@ export default function SearchResults() {
   const [onlyImages, setOnlyImages] = useState(false)
   const [onlyDescriptions, setOnlyDescriptions] = useState(false)
   const [onlyCommonNames, setOnlyCommonNames] = useState(false)
+  const [onlySounds, setOnlySounds] = useState(false)
   // 'contiene' vs 'empieza con' -- cambia el modo de busqueda en el backend,
   // asi que alternar este filtro relanza las 8 llamadas (no es un filtro en
   // memoria como los de arriba).
@@ -52,7 +53,7 @@ export default function SearchResults() {
 
   useEffect(() => {
     setSearchInput(q)
-    setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false)
+    setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false)
     if (!q.trim()) {
       setGroupsByRank({}); setRankStatus({}); setElapsedMs(null)
       return
@@ -105,10 +106,12 @@ export default function SearchResults() {
 
   function hasImage(item) { return item.flags?.images > 0 }
   function hasDescription(item) { return item.flags?.descriptions > 0 }
+  function hasSound(item) { return item.flags?.sounds > 0 }
   function hasCommonName(item) { return item.common_names?.length > 0 }
   function passesFilters(item) {
     if (onlyImages && !hasImage(item)) return false
     if (onlyDescriptions && !hasDescription(item)) return false
+    if (onlySounds && !hasSound(item)) return false
     if (onlyCommonNames && !hasCommonName(item)) return false
     return true
   }
@@ -122,7 +125,7 @@ export default function SearchResults() {
     sum + groupsByRank[rank].reduce((s, g) => s + g.items.filter(passesFilters).length, 0), 0)
   const totalRaw = ranksWithData.reduce((sum, rank) =>
     sum + groupsByRank[rank].reduce((s, g) => s + g.items.length, 0), 0)
-  const anyFilterActive = onlyImages || onlyDescriptions || onlyCommonNames
+  const anyFilterActive = onlyImages || onlyDescriptions || onlySounds || onlyCommonNames
 
   function formatElapsed(ms) {
     if (ms == null) return null
@@ -171,11 +174,15 @@ export default function SearchResults() {
               Con descripcion
             </label>
             <label className="bw-filter-chk">
+              <input type="checkbox" checked={onlySounds} onChange={(e) => setOnlySounds(e.target.checked)} />
+              Con sonido
+            </label>
+            <label className="bw-filter-chk">
               <input type="checkbox" checked={onlyCommonNames} onChange={(e) => setOnlyCommonNames(e.target.checked)} />
               Con nombre comun
             </label>
             {anyFilterActive && (
-              <button className="bw-btn" onClick={() => { setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false) }}>
+              <button className="bw-btn" onClick={() => { setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false) }}>
                 Limpiar filtros
               </button>
             )}

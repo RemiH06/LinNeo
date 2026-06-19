@@ -10,6 +10,8 @@ import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
 import Shui from './pages/Shui'
 import SearchResults from './pages/SearchResults'
+import MapExplorer from './pages/MapExplorer'
+import MapCountry from './pages/MapCountry'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Callout } from './components/ui'
 
@@ -73,11 +75,14 @@ function SpeciesPage() {
   )
 }
 
-// Elige el fondo global segun la ruta: TaxonNode y SearchResults usan el fondo
-// bookworm (papel/herbario); el resto sigue usando el grafo neural elixir.
+// Elige el fondo global segun la ruta: TaxonNode, SearchResults y las vistas
+// de mapa usan el fondo bookworm (papel/herbario); el resto sigue usando el
+// grafo neural elixir.
 function GlobalBackground() {
   const { pathname } = useLocation()
-  if (pathname.startsWith('/taxon/') || pathname.startsWith('/search')) return <BookwormBackground />
+  if (pathname.startsWith('/taxon/') || pathname.startsWith('/search') || pathname.startsWith('/map')) {
+    return <BookwormBackground />
+  }
   return <ElixirGraph />
 }
 
@@ -93,6 +98,8 @@ export default function App() {
             <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />
             <Route path="/taxon/:rank/:key" element={<ErrorBoundary><TaxonPage /></ErrorBoundary>} />
             <Route path="/search" element={<ErrorBoundary><SearchResults /></ErrorBoundary>} />
+            <Route path="/map/country/:code" element={<ErrorBoundary><MapCountry /></ErrorBoundary>} />
+            <Route path="/map/*" element={<ErrorBoundary><MapExplorer /></ErrorBoundary>} />
           </Routes>
         </BrowserRouter>
       </KingdomProvider>

@@ -121,6 +121,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   const [onlyImages, setOnlyImages] = useState(false)
   const [onlyDescriptions, setOnlyDescriptions] = useState(false)
   const [onlyCommonNames, setOnlyCommonNames] = useState(false)
+  const [onlySounds, setOnlySounds] = useState(false)
   // filtro alfabetico
   const [activeLetter, setActiveLetter] = useState(null)
   // filtro geografico (clic en el mapa)
@@ -130,7 +131,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   useEffect(() => {
     let alive = true
     setLoading(true); setError(null); setData(null)
-    setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false)
+    setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false)
     setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
     api.taxon(rank, nodeKey)
       .then((d) => { if (alive) { setData(d); setLoading(false) } })
@@ -150,6 +151,7 @@ export default function TaxonNode({ rank, nodeKey }) {
 
   function hasImage(c) { return c.flags?.images > 0 }
   function hasDescription(c) { return c.flags?.descriptions > 0 }
+  function hasSound(c) { return c.flags?.sounds > 0 }
   function hasCommonName(c) { return isSpeciesChild ? (c.common_names?.length > 0) : c.flags?.common_names > 0 }
 
   // letras disponibles (con al menos un hijo) para deshabilitar el resto
@@ -158,6 +160,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   const filteredChildren = children.filter((c) => {
     if (onlyImages && !hasImage(c)) return false
     if (onlyDescriptions && !hasDescription(c)) return false
+    if (onlySounds && !hasSound(c)) return false
     if (onlyCommonNames && !hasCommonName(c)) return false
     if (activeLetter && alphaKeyOf(c, childRank) !== activeLetter) return false
     if (activeCountry) {
@@ -176,10 +179,10 @@ export default function TaxonNode({ rank, nodeKey }) {
   }
   function clearGeoFilter() { setActiveCountry(null); setActiveContinent(null) }
   function clearAllFilters() {
-    setOnlyImages(false); setOnlyDescriptions(false); setOnlyCommonNames(false)
+    setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false)
     setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
   }
-  const anyFilterActive = onlyImages || onlyDescriptions || onlyCommonNames || activeLetter || activeCountry || activeContinent
+  const anyFilterActive = onlyImages || onlyDescriptions || onlySounds || onlyCommonNames || activeLetter || activeCountry || activeContinent
   const availableContinents = [...new Set((data?.countries || [])
     .map((iso) => ISO_CONTINENT[String(iso).toUpperCase()])
     .filter(Boolean))].sort()
@@ -285,6 +288,10 @@ export default function TaxonNode({ rank, nodeKey }) {
                 <label className="bw-filter-chk">
                   <input type="checkbox" checked={onlyDescriptions} onChange={(e) => setOnlyDescriptions(e.target.checked)} />
                   Con descripcion
+                </label>
+                <label className="bw-filter-chk">
+                  <input type="checkbox" checked={onlySounds} onChange={(e) => setOnlySounds(e.target.checked)} />
+                  Con sonido
                 </label>
                 <label className="bw-filter-chk">
                   <input type="checkbox" checked={onlyCommonNames} onChange={(e) => setOnlyCommonNames(e.target.checked)} />

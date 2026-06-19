@@ -29,6 +29,8 @@ export const api = {
   randomDescendants: (rank, key, n = 9) => get(`/random/${rank}/${key}?n=${n}`),
   continents: () => get('/continents'),
   countries: (continent) => get(`/continents/${encodeURIComponent(continent)}/countries`),
+  mapContinent: (continent) => get(`/map/continent/${encodeURIComponent(continent)}`),
+  mapCountry: (code) => get(`/map/country/${encodeURIComponent(code)}`),
 }
 // Paleta y etiquetas de los tipos de presencia (establishment_means)
 export const ESTABLISHMENT = {
