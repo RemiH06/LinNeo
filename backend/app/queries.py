@@ -358,6 +358,75 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
     return node
 
 
+def get_taxon_gallery(rank: str, key: int, limit: int = 250):
+    """
+    Especies CON IMAGEN descendientes de un taxon, sin importar la
+    profundidad (HAS_CHILD* completo, a diferencia de get_taxon_node que solo
+    trae hijos directos). Usado por TaxonGallery para que el mosaico
+    funcione en cualquier rango (genus, family, order, class...), no solo en
+    genus (cuyos hijos directos ya son especies).
+
+    El filtro EXISTS de imagen se aplica ANTES de cualquier trabajo pesado
+    (collect de hasta 5 imagenes, flags, etc.), asi que en un Phylum con
+    millones de especies sin imagen el costo real es solo el recorrido
+    HAS_CHILD* + el EXISTS, no el procesamiento completo de cada una.
+    Limitado a `limit` especies (250 por defecto) para no sobrecargar el
+    mosaico en grupos enormes.
+    """
+    rank = rank.lower()
+    if rank not in RANK_LABEL:
+        return None
+    label, keyprop = RANK_LABEL[rank]
+
+    name_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})
+        RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
+        LIMIT 1
+    """, {"key": key})
+    if not name_row:
+        return None
+    # mismo fix que graph_focus: solo Species/Genus tienen 'kingdom' propio
+    # denormalizado; para el resto se sube por HAS_CHILD* hasta el ancestro.
+    if rank == "kingdom":
+        taxon_kingdom = name_row[0]["name"]
+    elif name_row[0]["kingdom"]:
+        taxon_kingdom = name_row[0]["kingdom"]
+    else:
+        anc_rows = run_query(f"""
+            MATCH (k:Kingdom)-[:HAS_CHILD*]->(n:{label} {{{keyprop}: $key}})
+            RETURN coalesce(k.canonical_name, k.name) AS kname
+            LIMIT 1
+        """, {"key": key})
+        taxon_kingdom = anc_rows[0]["kname"] if anc_rows else None
+
+    cypher = f"""
+    MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+    WHERE EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type: 'image'}}) }}
+    WITH s
+    ORDER BY coalesce(s.canonical_name, s.scientific_name)
+    LIMIT $limit
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(mi:Media) WHERE mi.media_type = 'image'
+    WITH s, collect(DISTINCT mi.url)[0..5] AS images
+    RETURN {{
+        name: coalesce(s.canonical_name, s.scientific_name),
+        key: s.species_key,
+        rank: 'species',
+        kingdom: s.kingdom,
+        common_names: s.commonNames,
+        image: images[0],
+        images: images
+    }} AS sp
+    """
+    rows = run_query(cypher, {"key": key, "limit": limit})
+    species = [r["sp"] for r in rows if r.get("sp") and r["sp"].get("name")]
+    return {
+        "rank": rank, "key": key,
+        "name": name_row[0]["name"],
+        "kingdom": taxon_kingdom,
+        "species": species, "total": len(species),
+    }
+
+
 def filter_species(kingdom: str = None, country: str = None, habit: str = None, limit: int = 50):
     conditions = []
     params = {"limit": limit}

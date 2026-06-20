@@ -15,6 +15,7 @@ export const api = {
   searchDescription: (q, limit = 25) => get(`/search/description?q=${encodeURIComponent(q)}&limit=${limit}`),
   species: (key) => get(`/species/${key}`),
   taxon: (rank, key) => get(`/taxon/${rank}/${key}`),
+  taxonGallery: (rank, key, limit = 250) => get(`/taxon/${rank}/${key}/gallery?limit=${limit}`),
   filter: (params) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== '')

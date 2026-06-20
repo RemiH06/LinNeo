@@ -36,6 +36,10 @@ body.dark .bookworm-scope {
   transition: background-color .35s ease, border-color .35s ease, color .35s ease;
 }
 .bookworm-scope .bw-page { max-width: 980px; margin: 0 auto; padding: 40px; position: relative; z-index: 2; }
+/* TaxonGallery necesita mas ancho que el resto de bookworm para llegar a
+   ~70% del viewport con columnas de tamano fijo; .bw-page-wide quita el
+   limite de 980px solo en esa vista, sin afectar TaxonNode/SearchResults/etc. */
+.bookworm-scope .bw-page.bw-page-wide { max-width: none; }
 .bookworm-scope .bw-topbar { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-bottom: 30px; padding-bottom: 14px; border-bottom: 1px solid var(--bw-border); }
 .bookworm-scope h1 { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin-bottom: 4px; }
 .bookworm-scope h2 { font-family: var(--bw-mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--bw-accent); margin: 28px 0 12px; border-bottom: 1px solid var(--bw-border); padding-bottom: 6px; }

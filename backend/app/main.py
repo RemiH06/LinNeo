@@ -131,6 +131,19 @@ def taxon_node(rank: str, key: int):
     return node
 
 
+@app.get("/taxon/{rank}/{key}/gallery")
+def taxon_gallery(rank: str, key: int, limit: int = Query(250, ge=1, le=500)):
+    """
+    Especies con imagen descendientes de un taxon, sin importar la
+    profundidad. Usado por la vista de Galeria, que asi funciona en
+    cualquier rango (genus, family, order...) y no solo en genus.
+    """
+    gallery = queries.get_taxon_gallery(rank, key, limit)
+    if gallery is None:
+        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
+    return gallery
+
+
 # ── SHUI: grafo principal, ejemplos por reino, geografia ──
 
 @app.get("/kingdoms")

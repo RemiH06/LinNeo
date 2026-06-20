@@ -116,8 +116,14 @@ export function packTetris(items, cols = 5) {
     let pos = null
 
     if (count <= 1) {
-      // 1 imagen: intenta 3x3, luego 2x2, luego 1x1
-      for (const n of [3, 2, 1]) {
+      // 1 imagen: elige un tamano objetivo al azar (3x3, 2x2 o 1x1) y lo
+      // intenta PRIMERO; si no cabe, desciende solo hacia tamanos MAS CHICOS
+      // (nunca prueba uno mas grande que el elegido). 1x1 siempre cabe al
+      // final. Asi el resultado varia entre bloques chicos y grandes al azar,
+      // en vez de siempre salir el mas grande posible.
+      const target = rnd([3, 2, 1])
+      const sizesToTry = [3, 2, 1].filter((n) => n <= target)
+      for (const n of sizesToTry) {
         const candidate = squareShape(n)
         const found = findFit(occupied, cols, candidate, scanRows)
         if (found) { shape = candidate; pos = found; break }

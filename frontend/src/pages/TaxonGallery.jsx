@@ -18,8 +18,30 @@ import '../theme/bookworm.css'
   El packing real (bin-packing simple) vive en theme/tetrisPacker.js.
 */
 
-const CELL_PX = 90 // tamano base de celda en px (se ajusta responsivo via CSS)
+const CELL_PX = 90 // tamano base de celda en px
 const GAP_PX = 6
+const TARGET_WIDTH_RATIO = 0.7 // ~70% del ancho de viewport
+const MIN_COLS = 5 // piso para que en pantallas chicas no colapse a muy pocas columnas
+
+// Cuantas columnas de CELL_PX (+ gap) caben en el 70% del ancho de viewport
+// actual. Se recalcula en cada resize para que la galeria respire igual sin
+// importar el tamano real de pantalla del usuario.
+function useDynamicColumns() {
+  const [cols, setCols] = useState(() => computeCols())
+  useEffect(() => {
+    function onResize() { setCols(computeCols()) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return cols
+}
+function computeCols() {
+  if (typeof window === 'undefined') return MIN_COLS
+  const targetWidth = window.innerWidth * TARGET_WIDTH_RATIO
+  const perCol = CELL_PX + GAP_PX
+  const fit = Math.floor(targetWidth / perCol)
+  return Math.max(MIN_COLS, fit)
+}
 
 export default function TaxonGallery() {
   const { rank, key } = useParams()
@@ -29,6 +51,7 @@ export default function TaxonGallery() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const timer = useElapsedTimer()
+  const dynamicCols = useDynamicColumns()
 
   useSetKingdom(data?.kingdom)
   useKeyboardShortcuts({ navigate, toggleTheme })
@@ -37,32 +60,31 @@ export default function TaxonGallery() {
     let alive = true
     setLoading(true); setError(null); setData(null)
     timer.start()
-    api.taxon(rank, key)
+    api.taxonGallery(rank, key, 250)
       .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }
   }, [rank, key])
 
-  // especies con al menos 1 imagen, con su conteo real (tope 5, ya viene asi del backend)
+  // el backend ya filtra a especies con imagen (cualquier profundidad, no
+  // solo hijos directos); aqui solo se normaliza el shape para el packer.
   const withImages = useMemo(() => {
-    if (!data?.children) return []
-    return data.children
-      .filter((c) => c.rank === 'species' && (c.images?.length > 0 || c.image))
-      .map((c) => ({
-        ...c,
-        imageCount: c.images?.length || (c.image ? 1 : 0),
-        imageList: c.images?.length > 0 ? c.images : (c.image ? [c.image] : []),
-      }))
+    if (!data?.species) return []
+    return data.species.map((c) => ({
+      ...c,
+      imageCount: c.images?.length || (c.image ? 1 : 0),
+      imageList: c.images?.length > 0 ? c.images : (c.image ? [c.image] : []),
+    }))
   }, [data])
 
   const { placements, gridHeight, cols } = useMemo(
-    () => packTetris(withImages, 5),
-    [withImages]
+    () => packTetris(withImages, dynamicCols),
+    [withImages, dynamicCols]
   )
 
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
-      <div className="bw-page">
+      <div className="bw-page bw-page-wide">
         <div className="bw-topbar">
           <LinNeoLogo />
           <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
@@ -81,7 +103,10 @@ export default function TaxonGallery() {
               <div className="bw-header-title">
                 <div className="bw-rank">Galeria · {RANK_LABEL(data.rank)}</div>
                 <h1>{data.name}</h1>
-                <p className="bw-muted">{withImages.length} especie(s) con imagen.</p>
+                <p className="bw-muted">
+                  {withImages.length} especie(s) con imagen.
+                  {data.total === 250 && ' Mostrando las primeras 250.'}
+                </p>
               </div>
             </div>
 
