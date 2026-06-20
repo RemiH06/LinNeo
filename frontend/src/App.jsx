@@ -6,6 +6,7 @@ import ElixirGraph from './backgrounds/ElixirGraph'
 import BookwormBackground from './backgrounds/BookwormBackground'
 import KingdomBackdrop from './backgrounds/KingdomBackdrop'
 import ThemeToggle from './components/ThemeToggle'
+import LinNeoLogo from './components/LinNeoLogo'
 import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
 import Shui from './pages/Shui'
@@ -67,7 +68,10 @@ function SpeciesPage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <button className="btn" onClick={() => navigate('/')}>{'\u2039'} volver</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <LinNeoLogo />
+          <button className="btn" onClick={() => navigate('/')}>{'\u2039'} volver</button>
+        </div>
         <ThemeToggle />
       </div>
       <SpeciesDetail speciesKey={key} onOpenMedia={onOpenMedia} />

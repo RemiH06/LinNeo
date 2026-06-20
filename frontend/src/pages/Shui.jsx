@@ -7,7 +7,10 @@ import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { KINGDOM_HUE } from '../theme/kingdomColor'
 import ThemeToggle from '../components/ThemeToggle'
+import LinNeoLogo from '../components/LinNeoLogo'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
+import LoadingSpinner from '../components/LoadingSpinner'
 import '../theme/shui.css'
 
 function glowFor(kingdom, dark) {
@@ -98,15 +101,25 @@ export default function Shui() {
   }
 
   useSetKingdom(focusKingdom)
+  const initialTimer = useElapsedTimer()
+  const [initialLoading, setInitialLoading] = useState(true)
+  const focusTimer = useElapsedTimer()
+  const [focusLoading, setFocusLoading] = useState(false)
 
   useEffect(() => {
-    api.graph().then((g) => { setGraphData(g); setFullGraph(g); setDomainGroups(deriveDomainGroups(g)) }).catch(() => {})
+    initialTimer.start()
+    let pending = 2
+    const settle = () => { pending -= 1; if (pending === 0) { setInitialLoading(false); initialTimer.stop() } }
+    api.graph().then((g) => { setGraphData(g); setFullGraph(g); setDomainGroups(deriveDomainGroups(g)); settle() }).catch(settle)
     api.kingdoms().then((ks) => {
       setKingdoms(ks)
       const names = ks.map((k) => k.name)
       setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
-    }).catch(() => {})
-    loadKingdomExamples()
+      settle()
+    }).catch(settle)
+    // nota: la barra de ejemplos NO se carga aqui -- el useEffect reactivo a
+    // activeKingdoms (abajo) ya la dispara en cuanto setActiveKingdoms
+    // resuelve con los reinos default, evitando una doble carga/parpadeo.
   }, [])
 
   // guardamos el grafo completo para filtrar por reino sin re-pedir
@@ -126,13 +139,16 @@ export default function Shui() {
     const ids = new Set(nodes.map((n) => n.id))
     const links = full.links.filter((l) => ids.has(l.source) && ids.has(l.target))
     setGraphData({ ...full, nodes, links })
+    // la barra de ejemplos tambien debe respetar el pot de reinos activos
+    loadKingdomExamples()
   }, [activeKingdoms, focusNode])
 
+  // Pot de ejemplos: n tiradas, cada una elige un reino al azar DENTRO de los
+  // reinos activos (no 1 garantizado por reino). Vacio = usa todos los reinos.
   function loadKingdomExamples() {
     setExLoading(true); setExError(false)
-    api.randomKingdoms().then((rows) => {
-      const ex = rows.map((r) => r.examples?.[0]).filter(Boolean)
-      setExamples(ex); setExLoading(false)
+    api.randomPool([...activeKingdoms], 8).then((rows) => {
+      setExamples(rows || []); setExLoading(false)
     }).catch(() => { setExError(true); setExLoading(false) })
   }
 
@@ -143,15 +159,19 @@ export default function Shui() {
       loadKingdomExamples()
       return
     }
+    if (focusLoading) return // evita carreras si se hace click varias veces mientras carga
+    setFocusLoading(true)
+    focusTimer.start()
     api.graphFocus(node.rank, node.key).then((g) => {
       setGraphData(g)
       setFocusKingdom(g.kingdom || null)
       setFocusNode(node)
+      setFocusLoading(false); focusTimer.stop()
       setExLoading(true); setExError(false)
       api.randomDescendants(node.rank, node.key, 9)
         .then((rows) => { setExamples(rows || []); setExLoading(false) })
         .catch(() => { setExError(true); setExLoading(false) })
-    }).catch(() => {})
+    }).catch(() => { setFocusLoading(false); focusTimer.stop() })
   }
 
   function toggleKingdom(name) {
@@ -306,7 +326,7 @@ export default function Shui() {
       <div className="sh-page">
         <div className="sh-top">
           <div className="sh-topbar">
-            <div className="sh-title">LinNeo<span>_</span></div>
+            <LinNeoLogo className="sh-title" />
             <div className="sh-searchbar" ref={resultsWrapRef}>
               <input ref={searchRef} className="sh-input" value={q}
                 onChange={(e) => onSearch(e.target.value)}
@@ -377,6 +397,18 @@ export default function Shui() {
           {/* Centro: grafo */}
           <div className="sh-center-col">
             <div className="sh-graph-wrap">
+              {(initialLoading || focusLoading) && (
+                <div className="ln-map-overlay">
+                  <LoadingSpinner
+                    inline={false}
+                    timeText={
+                      focusLoading
+                        ? (focusTimer.elapsedMs != null ? formatElapsed(focusTimer.elapsedMs) : null)
+                        : (initialTimer.elapsedMs != null ? formatElapsed(initialTimer.elapsedMs) : null)
+                    }
+                  />
+                </div>
+              )}
               {graphData && <ShuiGraph data={graphData} onFocus={focusOn} onOpenSpecies={(k) => navigate(`/species/${k}`)} />}
             </div>
           </div>

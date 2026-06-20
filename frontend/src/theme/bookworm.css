@@ -18,13 +18,25 @@ body:has(.bookworm-scope)::after { display: none; }
   color: var(--bw-text);
   font-family: var(--bw-serif);
   min-height: 100vh;
+  transition: background-color .35s ease, color .35s ease;
 }
 body.dark .bookworm-scope {
   --bw-bg:#0C100A; --bw-bg2:#121810; --bw-bg3:#1A2016; --bw-text:#D8E0C8; --bw-text2:#8A9878;
   --bw-border:#2A3824; --bw-moss:#5A7850; --bw-bark:#5A3818; --bw-ochre:#988040; --bw-amber:#A87830;
   --bw-accent:#5A7850; --bw-accent2:#988040; --bw-danger:#983020;
 }
+/* transicion suave de colores al cambiar tema, en elementos sin transicion
+   propia ya definida (bw-child y similares ya usan 'transition: all .15s') */
+.bookworm-scope .bw-btn,
+.bookworm-scope .bw-alpha-letter,
+.bookworm-scope .sr-input,
+.bookworm-scope .bw-filter-chk,
+.bookworm-scope .bw-stat-val,
+.bookworm-scope .bw-stat-lbl {
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
 .bookworm-scope .bw-page { max-width: 980px; margin: 0 auto; padding: 40px; position: relative; z-index: 2; }
+.bookworm-scope .bw-topbar { display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-bottom: 30px; padding-bottom: 14px; border-bottom: 1px solid var(--bw-border); }
 .bookworm-scope h1 { font-size: 30px; font-weight: 700; letter-spacing: -.5px; margin-bottom: 4px; }
 .bookworm-scope h2 { font-family: var(--bw-mono); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--bw-accent); margin: 28px 0 12px; border-bottom: 1px solid var(--bw-border); padding-bottom: 6px; }
 .bookworm-scope .bw-muted { color: var(--bw-text2); font-family: var(--bw-mono); font-size: 12px; }

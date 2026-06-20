@@ -8,6 +8,8 @@ import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import ImageLightbox from '../components/ImageLightbox'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { useNavigate } from 'react-router-dom'
 import '../theme/lightbox.css'
 
@@ -52,18 +54,24 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const { dark, toggle: toggleTheme } = useTheme()
   useSetKingdom(data?.kingdom)
   const [lightbox, setLightbox] = useState(null) // { items, index } | null
+  const timer = useElapsedTimer()
   useKeyboardShortcuts({ navigate, toggleTheme })
 
   useEffect(() => {
     let alive = true
     setLoading(true); setError(null); setData(null)
+    timer.start()
     api.species(speciesKey)
-      .then((d) => { if (alive) { setData(d); setLoading(false) } })
-      .catch((e) => { if (alive) { setError(e.message); setLoading(false) } })
+      .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
+      .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }
   }, [speciesKey])
 
-  if (loading) return <Callout title="Cargando">Consultando el grafo...</Callout>
+  if (loading) return (
+    <Callout title="Cargando">
+      <LoadingSpinner inline={false} timeText={timer.elapsedMs != null ? formatElapsed(timer.elapsedMs) : null} />
+    </Callout>
+  )
   if (error) return <Callout title="Error" variant="danger">{error}</Callout>
   if (!data) return null
 

@@ -5,7 +5,10 @@ import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
+import LoadingSpinner from '../components/LoadingSpinner'
 import { ISO_CONTINENT, isoToName } from '../components/DistributionMap'
+import LinNeoLogo from '../components/LinNeoLogo'
 import '../theme/bookworm.css'
 
 /*
@@ -73,6 +76,7 @@ export default function MapExplorer() {
   const { toggle: toggleTheme } = useTheme()
   const [geo, setGeo] = useState(null)
   const [error, setError] = useState(false)
+  const timer = useElapsedTimer()
   const [hoverKey, setHoverKey] = useState(null) // continente (vista mundo) o ISO de pais (vista continente)
 
   useSetKingdom(null)
@@ -80,8 +84,9 @@ export default function MapExplorer() {
 
   useEffect(() => {
     let alive = true
-    fetch(GEO_URL).then((r) => r.json()).then((d) => { if (alive) setGeo(d) })
-      .catch(() => { if (alive) setError(true) })
+    timer.start()
+    fetch(GEO_URL).then((r) => r.json()).then((d) => { if (alive) { setGeo(d); timer.stop() } })
+      .catch(() => { if (alive) { setError(true); timer.stop() } })
     return () => { alive = false }
   }, [])
 
@@ -139,11 +144,14 @@ export default function MapExplorer() {
   return (
     <div className="bookworm-scope">
       <div className="bw-page">
-        {continent ? (
-          <button className="bw-btn" onClick={() => navigate('/map')}>{'\u2039'} mapa mundial</button>
-        ) : (
-          <button className="bw-btn" onClick={() => navigate('/')}>{'\u2039'} volver a Shui</button>
-        )}
+        <div className="bw-topbar">
+          <LinNeoLogo />
+          {continent ? (
+            <button className="bw-btn" onClick={() => navigate('/map')}>{'\u2039'} mapa mundial</button>
+          ) : (
+            <button className="bw-btn" onClick={() => navigate('/')}>{'\u2039'} volver a Shui</button>
+          )}
+        </div>
 
         <div className="bw-header">
           <div className="bw-header-title">
@@ -160,7 +168,12 @@ export default function MapExplorer() {
 
         {error && <p style={{ color: 'var(--bw-danger)' }}>No se pudo cargar el mapa.</p>}
 
-        <div className="bw-map" style={{ marginTop: 12 }}>
+        <div className="bw-map" style={{ marginTop: 12, position: 'relative' }}>
+          {!geo && !error && (
+            <div className="ln-map-overlay">
+              <LoadingSpinner inline={false} timeText={timer.elapsedMs != null ? formatElapsed(timer.elapsedMs) : null} />
+            </div>
+          )}
           <MapContainer center={WORLD_CENTER} zoom={WORLD_ZOOM} minZoom={1.5}
             style={{ height: 560, width: '100%', background: '#cec4ac' }}
             attributionControl={false} zoomControl={true} scrollWheelZoom={true} worldCopyJump={true}>

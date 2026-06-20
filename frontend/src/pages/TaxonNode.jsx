@@ -8,7 +8,10 @@ import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
+import LinNeoLogo from '../components/LinNeoLogo'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
+import LoadingSpinner from '../components/LoadingSpinner'
 import '../theme/bookworm.css'
 
 const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
@@ -113,6 +116,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const timer = useElapsedTimer()
   const navigate = useNavigate()
   const { dark, toggle: toggleTheme } = useTheme()
   useSetKingdom(data?.kingdom)
@@ -133,9 +137,10 @@ export default function TaxonNode({ rank, nodeKey }) {
     setLoading(true); setError(null); setData(null)
     setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false)
     setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
+    timer.start()
     api.taxon(rank, nodeKey)
-      .then((d) => { if (alive) { setData(d); setLoading(false) } })
-      .catch((e) => { if (alive) { setError(e.message); setLoading(false) } })
+      .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
+      .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }
   }, [rank, nodeKey])
 
@@ -197,9 +202,16 @@ export default function TaxonNode({ rank, nodeKey }) {
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
       <div className="bw-page">
-        <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
+        <div className="bw-topbar">
+          <LinNeoLogo />
+          <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
+        </div>
 
-        {loading && <p className="bw-muted" style={{ marginTop: 20 }}>Cargando...</p>}
+        {loading && (
+          <div style={{ marginTop: 20 }}>
+            <LoadingSpinner inline={false} timeText={timer.elapsedMs != null ? formatElapsed(timer.elapsedMs) : null} />
+          </div>
+        )}
         {error && <p style={{ marginTop: 20, color: 'var(--bw-danger)' }}>{error}</p>}
 
         {data && (

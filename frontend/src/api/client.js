@@ -26,6 +26,12 @@ export const api = {
   graph: () => get('/graph'),
   graphFocus: (rank, key) => get(`/graph/${rank}/${key}`),
   randomKingdoms: () => get('/random/kingdoms'),
+  randomPool: (kingdoms = [], n = 8) => {
+    const qs = new URLSearchParams()
+    kingdoms.forEach((k) => qs.append('kingdoms', k))
+    qs.set('n', n)
+    return get(`/random/pool?${qs.toString()}`)
+  },
   randomDescendants: (rank, key, n = 9) => get(`/random/${rank}/${key}?n=${n}`),
   continents: () => get('/continents'),
   countries: (continent) => get(`/continents/${encodeURIComponent(continent)}/countries`),

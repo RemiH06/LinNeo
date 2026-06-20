@@ -11,7 +11,7 @@ Docs interactivas: http://localhost:8000/docs
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import List, Optional
 
 from . import queries
 from .db import close_driver
@@ -159,6 +159,19 @@ def random_kingdoms():
     return queries.random_by_kingdom(1)
 
 
+@app.get("/random/pool")
+def random_pool(
+    kingdoms: List[str] = Query(default=[], description="Reinos activos (pot); vacio = todos"),
+    n: int = Query(8, ge=1, le=30),
+):
+    """
+    'Pot' de reinos: n tiradas independientes, cada una elige un reino al
+    azar dentro de `kingdoms` (no garantiza 1 por reino). Usado por la barra
+    de ejemplos de Shui para respetar los reinos activos en los checkboxes.
+    """
+    return queries.random_from_kingdom_pool(kingdoms, n)
+
+
 @app.get("/random/{rank}/{key}")
 def random_descendants(rank: str, key: int, n: int = Query(9, ge=1, le=20)):
     """Especies aleatorias con descripcion descendientes de un nodo."""
@@ -191,7 +204,3 @@ def map_country(code: str):
     if node is None:
         raise HTTPException(status_code=404, detail="Pais no encontrado")
     return node
-
-
-#* Fue un día productivo, por favor vete a dormir.
-# TODO dormir

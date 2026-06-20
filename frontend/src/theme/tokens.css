@@ -114,6 +114,18 @@ p.muted { color: var(--text2); font-size: 12px; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
+/* Wordmark "LinNeo_" compartido (LinNeoLogo.jsx), usado como link de vuelta
+   a la landing (Shui) en todas las vistas. Cada tema (shui/bookworm) puede
+   sobreescribir el color via su propio CSS con mayor especificidad si hace
+   falta; esto da solo el comportamiento/tipografia base. */
+.linneo-logo {
+  display: inline-block; font-size: 22px; font-weight: 700; letter-spacing: -1px;
+  color: var(--text); text-decoration: none; cursor: pointer;
+  transition: color .35s ease, opacity .15s ease;
+}
+.linneo-logo:hover { opacity: .82; text-decoration: none; }
+.linneo-logo .linneo-logo-underscore { color: var(--accent); }
+
 .callout { border-left: 2px solid var(--accent); background: var(--bg2); padding: 12px 16px; margin: 10px 0; border-radius: 0 var(--radius) var(--radius) 0; }
 .callout-title { font-size: 9px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
 .callout p { margin-bottom: 0; font-size: 12px; }
@@ -217,3 +229,53 @@ audio { width: 100%; margin: 6px 0; }
 /* imagenes en columna lateral derecha (apiladas) */
 .media-grid-side { display: flex; flex-direction: column; gap: 8px; }
 .media-grid-side .media-thumb-lg { aspect-ratio: 4/3; width: 100%; }
+
+/* ============================================================
+   LoadingSpinner -- animacion de carga compartida (LoadingSpinner.jsx).
+   Se tine con var(--accent), que cada tema/scope ya sobreescribe.
+============================================================ */
+@keyframes ln-spin { to { transform: rotate(360deg); } }
+.ln-spinner { animation: ln-spin 0.9s linear infinite; }
+.ln-spinner-track { stroke: var(--accent); opacity: .18; }
+.ln-spinner-arc { stroke: var(--accent); }
+
+.ln-loading-inline {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: inherit; color: inherit;
+}
+.ln-loading-block {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 32px 0; opacity: .75;
+}
+.ln-loading-block .ln-spinner { width: 32px; height: 32px; }
+.ln-loading-label { font-size: 12px; color: currentColor; min-height: 14px; }
+
+/* barra de progreso simulada (solo visible cuando inline=false o showBar) */
+.ln-progress-wrap { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.ln-progress-bar {
+  position: relative; width: 160px; height: 6px; border-radius: 4px;
+  background: rgba(127, 127, 127, 0.25);
+  overflow: hidden;
+}
+.ln-progress-fill {
+  height: 100%; border-radius: 4px;
+  background: var(--accent);
+  transition: width .15s linear;
+}
+.ln-progress-pct {
+  font-size: 10px; color: currentColor; letter-spacing: .04em;
+  min-width: 28px; text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ln-spinner { animation: none; }
+}
+
+/* overlay de carga sobre mapas Leaflet (mientras el GeoJSON no ha llegado) */
+.ln-map-overlay {
+  position: absolute; inset: 0; z-index: 500;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 18, 14, 0.35);
+  pointer-events: none;
+  color: #fff;
+}

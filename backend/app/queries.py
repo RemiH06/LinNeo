@@ -1,5 +1,8 @@
 """Queries Cypher de LinNeo, separadas de la logica de la API."""
 
+import random
+from collections import Counter
+
 from .db import run_query
 
 # Etiqueta Neo4j y propiedad-key por rango taxonomico
@@ -556,6 +559,54 @@ def random_by_kingdom(per_kingdom: int = 1):
     RETURN kingdom, examples
     """
     return run_query(cypher, {"n": per_kingdom})
+
+
+def random_from_kingdom_pool(kingdoms: list, n: int = 8):
+    """
+    'Pot' de reinos activos: hace `n` tiradas independientes, cada una elige
+    un reino al azar DENTRO de `kingdoms` (no uno fijo por reino), y dentro de
+    ese reino una especie al azar con descripcion. Un mismo reino puede salir
+    varias veces o ninguna -- es un sorteo real, no 1 por reino garantizado.
+    Si `kingdoms` viene vacio, usa todos los Kingdom existentes como pool.
+    El sorteo del reino se hace en Python (random.choice) para no depender de
+    sintaxis Cypher de indexacion dinamica de listas; cada tirada resultante
+    se agrupa por reino para hacer una sola query por reino distinto que
+    salio en el sorteo (no N queries individuales).
+    """
+    if not kingdoms:
+        rows = run_query("MATCH (k:Kingdom) RETURN coalesce(k.canonical_name, k.name) AS name")
+        kingdoms = [r["name"] for r in rows if r.get("name")]
+    if not kingdoms:
+        return []
+
+    draws = [random.choice(kingdoms) for _ in range(n)]
+    counts = Counter(draws)
+
+    cypher = """
+    UNWIND $picks AS pick
+    CALL {
+        WITH pick
+        MATCH (s:Species)
+        WHERE s.kingdom = pick.kingdom AND EXISTS { (s)-[:HAS_DESCRIPTION]->(:Description) }
+        WITH s, rand() AS r ORDER BY r LIMIT pick.count
+        OPTIONAL MATCH (s)-[m:HAS_MEDIA]->(md:Media) WHERE md.media_type = 'image'
+        WITH s, head(collect(md.url)) AS image
+        RETURN collect({
+            species_key: s.species_key,
+            name: coalesce(s.canonical_name, s.scientific_name),
+            kingdom: s.kingdom,
+            image: image
+        }) AS examples
+    }
+    RETURN examples
+    """
+    picks = [{"kingdom": k, "count": c} for k, c in counts.items()]
+    rows = run_query(cypher, {"picks": picks})
+    examples = []
+    for r in rows:
+        examples.extend(r.get("examples") or [])
+    random.shuffle(examples)
+    return examples[:n]
 
 
 def random_descendants(rank: str, key: int, n: int = 9):

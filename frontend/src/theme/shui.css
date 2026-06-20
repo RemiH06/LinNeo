@@ -18,6 +18,20 @@
   z-index: 5;
   height: 100vh;
   overflow: hidden;
+  transition: background-color .35s ease, color .35s ease;
+}
+/* transicion suave de colores al cambiar tema, sin pisar transiciones propias
+   (cajon deslizable, hover de tarjetas, etc.) ni afectar el canvas del grafo */
+.shui-scope .sh-side,
+.shui-scope .sh-input,
+.shui-scope .sh-select,
+.shui-scope .sh-results,
+.shui-scope .sh-result,
+.shui-scope .sh-kbtn,
+.shui-scope .sh-check-domain,
+.shui-scope .sh-kingdom-sublist {
+  transition: background-color .35s ease, border-color .35s ease, color .35s ease;
+}
 }
 body.dark .shui-scope {
   --sh-bg:#020608; --sh-bg2:#040C10; --sh-bg3:#081018; --sh-text:#C0E8F0; --sh-text2:#406878;
