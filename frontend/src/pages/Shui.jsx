@@ -152,10 +152,19 @@ export default function Shui() {
     }).catch(() => { setExError(true); setExLoading(false) })
   }
 
+  // contador de "operacion vigente": cada llamada a focusOn (sea foco o
+  // reset) lo incrementa; una promesa que resuelve tarde solo aplica sus
+  // cambios si su id sigue siendo el vigente. Evita que un click en un nodo
+  // "reviva" el foco despues de que el usuario ya presiono Reiniciar
+  // mientras la respuesta de graphFocus seguia en vuelo.
+  const focusOpRef = useRef(0)
+
   function focusOn(node) {
+    const opId = ++focusOpRef.current
     if (!node) {
       setGraphData(fullGraphRef.current)
       setFocusKingdom(null); setFocusNode(null)
+      setFocusLoading(false); focusTimer.stop()
       loadKingdomExamples()
       return
     }
@@ -163,15 +172,26 @@ export default function Shui() {
     setFocusLoading(true)
     focusTimer.start()
     api.graphFocus(node.rank, node.key).then((g) => {
-      setGraphData(g)
-      setFocusKingdom(g.kingdom || null)
+      if (focusOpRef.current !== opId) return // una operacion mas reciente (otro click o un reset) ya tomo el control
+      // Fallback: si el backend no pudo determinar el reino del nuevo nodo
+      // (rangos como Phylum/Class/Order/Family no tienen su propia propiedad
+      // 'kingdom' poblada en Neo4j -- solo Species/Genus la tienen, y Kingdom
+      // usa su propio nombre), se mantiene el reino del foco anterior en vez
+      // de perderlo. Al navegar SIEMPRE bajamos dentro del mismo reino o nos
+      // quedamos igual, nunca subimos a otro, asi que el valor previo sigue
+      // siendo correcto.
+      const nextKingdom = g.kingdom || focusKingdom
+      setGraphData({ ...g, kingdom: nextKingdom })
+      setFocusKingdom(nextKingdom)
       setFocusNode(node)
       setFocusLoading(false); focusTimer.stop()
       setExLoading(true); setExError(false)
       api.randomDescendants(node.rank, node.key, 9)
-        .then((rows) => { setExamples(rows || []); setExLoading(false) })
-        .catch(() => { setExError(true); setExLoading(false) })
-    }).catch(() => { setFocusLoading(false); focusTimer.stop() })
+        .then((rows) => { if (focusOpRef.current === opId) { setExamples(rows || []); setExLoading(false) } })
+        .catch(() => { if (focusOpRef.current === opId) { setExError(true); setExLoading(false) } })
+    }).catch(() => {
+      if (focusOpRef.current === opId) { setFocusLoading(false); focusTimer.stop() }
+    })
   }
 
   function toggleKingdom(name) {

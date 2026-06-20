@@ -456,10 +456,12 @@ def graph_focus(rank: str, key: int, depth: int = 1):
     label, keyprop = RANK_LABEL[rank]
 
     # reino del nodo (para tintar). El nodo Kingdom no tiene una propiedad propia
-    # 'kingdom' en Neo4j (esa propiedad esta denormalizada en Species/Genus/etc para
-    # queries rapidas) -- si el rank enfocado es justo 'kingdom', su propio nombre
-    # ES el reino de tinte (igual patron que graph_default). Domain mismo caso pero
-    # ese se resuelve aparte, no se tinta un solo color (ver mas abajo).
+    # 'kingdom' en Neo4j (esa propiedad esta denormalizada solo en Species/Genus
+    # para queries rapidas; Phylum/Class/Order/Family NO la tienen) -- si el rank
+    # enfocado es justo 'kingdom', su propio nombre ES el reino de tinte (igual
+    # patron que graph_default). Para cualquier otro rango sin la propiedad
+    # propia, se sube por HAS_CHILD hasta el Kingdom ancestro real. Domain es
+    # caso aparte, no se tinta un solo color (ver mas abajo).
     krow = run_query(f"""
         MATCH (n:{label} {{{keyprop}: $key}})
         RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
@@ -468,7 +470,20 @@ def graph_focus(rank: str, key: int, depth: int = 1):
     if not krow:
         return None
     center_name = krow[0]["name"]
-    kingdom = center_name if rank == "kingdom" else krow[0]["kingdom"]
+    if rank == "kingdom":
+        kingdom = center_name
+    elif rank == "domain":
+        kingdom = None
+    elif krow[0]["kingdom"]:
+        kingdom = krow[0]["kingdom"]
+    else:
+        # fallback: subir por HAS_CHILD hasta el Kingdom ancestro
+        anc_rows = run_query(f"""
+            MATCH (k:Kingdom)-[:HAS_CHILD*]->(n:{label} {{{keyprop}: $key}})
+            RETURN coalesce(k.canonical_name, k.name) AS kname
+            LIMIT 1
+        """, {"key": key})
+        kingdom = anc_rows[0]["kname"] if anc_rows else None
 
     # cadena de rangos hacia abajo desde `rank`
     chain = []
@@ -484,14 +499,30 @@ def graph_focus(rank: str, key: int, depth: int = 1):
     links = []
     seen = {center_id}
 
-    # nivel 1
+    # nivel 1: ordenado por cantidad de hijos propios (descendientes directos),
+    # no alfabetico -- asi las ramas con mas contenido (ej. tras reconectar
+    # huerfanos de Fungi) siempre entran en el cap de 60, en vez de perderse
+    # por orden alfabetico frente a ramas pequenas que empiezan con A.
     if chain:
         lvl1_label, lvl1_keyprop = RANK_LABEL[chain[0]]
-        lvl1 = run_query(f"""
-            MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:{lvl1_label})
-            RETURN c.{lvl1_keyprop} AS key, coalesce(c.canonical_name, c.name, c.scientific_name) AS name
-            ORDER BY name LIMIT 60
-        """, {"key": key})
+        lvl1 = []
+        if len(chain) > 1:
+            lvl2_label, lvl2_keyprop = RANK_LABEL[chain[1]]
+            lvl1 = run_query(f"""
+                MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:{lvl1_label})
+                OPTIONAL MATCH (c)-[:HAS_CHILD]->(gc:{lvl2_label})
+                WITH c, count(DISTINCT gc) AS n_children
+                RETURN c.{lvl1_keyprop} AS key, coalesce(c.canonical_name, c.name, c.scientific_name) AS name, n_children
+                ORDER BY n_children DESC, name LIMIT 60
+            """, {"key": key})
+        else:
+            # rank ya es el ultimo nivel con hijos (ej. genus -> species, sin
+            # nivel 2 despues); no hay nietos que contar, alfabetico esta bien
+            lvl1 = run_query(f"""
+                MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD]->(c:{lvl1_label})
+                RETURN c.{lvl1_keyprop} AS key, coalesce(c.canonical_name, c.name, c.scientific_name) AS name
+                ORDER BY name LIMIT 60
+            """, {"key": key})
         for c in lvl1:
             if not c.get("name"):
                 continue
@@ -504,7 +535,11 @@ def graph_focus(rank: str, key: int, depth: int = 1):
                 seen.add(cid)
                 nodes.append({"id": cid, "name": c["name"], "rank": chain[0], "key": c["key"], "kingdom": child_kingdom})
             links.append({"source": center_id, "target": cid})
-        # nivel 2
+        # nivel 2: CUPO FIJO de nietos por cada hermano de nivel 1 (no un LIMIT
+        # global), asi ningun hermano se queda en cero aunque su vecino tenga
+        # miles de hijos. 15 por hermano x hasta 60 hermanos = techo teorico
+        # de 900 nodos, pero en la practica casi siempre es mucho menos.
+        NIETOS_POR_HERMANO = 15
         if len(chain) > 1:
             lvl2_label, lvl2_keyprop = RANK_LABEL[chain[1]]
             lvl1_keys = [c["key"] for c in lvl1 if c.get("key") is not None]
@@ -513,22 +548,27 @@ def graph_focus(rank: str, key: int, depth: int = 1):
                 lvl2 = run_query(f"""
                     MATCH (p:{lvl1_label})-[:HAS_CHILD]->(c:{lvl2_label})
                     WHERE p.{lvl1_keyprop} IN $pkeys
-                    RETURN p.{lvl1_keyprop} AS pkey, c.{lvl2_keyprop} AS key,
-                           coalesce(c.canonical_name, c.name, c.scientific_name) AS name
-                    ORDER BY name LIMIT 300
-                """, {"pkeys": lvl1_keys})
-                for c in lvl2:
-                    if not c.get("name"):
-                        continue
-                    pid = f"{chain[0]}:{c['pkey']}"
-                    cid = f"{chain[1]}:{c['key']}"
-                    # Mismo criterio: si el padre directo es Kingdom, el nieto hereda
-                    # el nombre de ESE kingdom padre (no el kingdom global del centro).
-                    grandchild_kingdom = lvl1_kingdom_by_key.get(c["pkey"], kingdom) if lvl1_kingdom_by_key else kingdom
-                    if cid not in seen:
-                        seen.add(cid)
-                        nodes.append({"id": cid, "name": c["name"], "rank": chain[1], "key": c["key"], "kingdom": grandchild_kingdom})
-                    links.append({"source": pid, "target": cid})
+                    WITH p, c
+                    ORDER BY coalesce(c.canonical_name, c.name, c.scientific_name)
+                    WITH p, collect({{
+                        key: c.{lvl2_keyprop},
+                        name: coalesce(c.canonical_name, c.name, c.scientific_name)
+                    }})[0..$cupo] AS kids
+                    RETURN p.{lvl1_keyprop} AS pkey, kids
+                """, {"pkeys": lvl1_keys, "cupo": NIETOS_POR_HERMANO})
+                for row in lvl2:
+                    pid = f"{chain[0]}:{row['pkey']}"
+                    for c in row["kids"]:
+                        if not c.get("name"):
+                            continue
+                        cid = f"{chain[1]}:{c['key']}"
+                        # Mismo criterio: si el padre directo es Kingdom, el nieto hereda
+                        # el nombre de ESE kingdom padre (no el kingdom global del centro).
+                        grandchild_kingdom = lvl1_kingdom_by_key.get(row["pkey"], kingdom) if lvl1_kingdom_by_key else kingdom
+                        if cid not in seen:
+                            seen.add(cid)
+                            nodes.append({"id": cid, "name": c["name"], "rank": chain[1], "key": c["key"], "kingdom": grandchild_kingdom})
+                        links.append({"source": pid, "target": cid})
 
     return {"nodes": nodes, "links": links, "center": center_id, "kingdom": kingdom}
 
