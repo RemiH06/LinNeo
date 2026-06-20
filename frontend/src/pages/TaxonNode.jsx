@@ -217,7 +217,7 @@ export default function TaxonNode({ rank, nodeKey }) {
         {data && (
           <>
             {/* ── Zona 1: header ── */}
-            <div className="bw-header">
+            <div className="bw-header bw-header-2col">
               <div className="bw-header-title">
                 <div className="bw-rank">{RANK_ES[data.rank] || data.rank}</div>
                 <h1>{data.name}</h1>
@@ -234,6 +234,27 @@ export default function TaxonNode({ rank, nodeKey }) {
                     {totalDesc > 0 && <span className="bw-stat"><span className="bw-stat-val">{totalDesc.toLocaleString()}</span><span className="bw-stat-lbl">descripciones</span></span>}
                   </div>
                 )}
+              </div>
+
+              {/* Vistas alternativas: bloqueadas si no hay contenido del tipo correspondiente */}
+              <div className="bw-altviews">
+                <button
+                  className="bw-btn bw-altview-btn"
+                  disabled={totalImages === 0}
+                  title={totalImages === 0 ? 'Ningun hijo tiene imagenes' : 'Ver galeria de imagenes'}
+                  onClick={() => navigate(`/taxon/${rank}/${nodeKey}/gallery`)}
+                >{'\u25A3'} Galeria</button>
+                <button
+                  className="bw-btn bw-altview-btn"
+                  disabled={totalSounds === 0}
+                  title={totalSounds === 0 ? 'Ningun hijo tiene sonidos' : 'Explorar sonidos'}
+                  onClick={() => navigate(`/taxon/${rank}/${nodeKey}/sounds`)}
+                >{'\u266A'} Sonidos</button>
+                <button
+                  className="bw-btn bw-altview-btn"
+                  title="Ver infografia del clado"
+                  onClick={() => navigate(`/taxon/${rank}/${nodeKey}/infographic`)}
+                >{'\u2731'} Infografia</button>
               </div>
             </div>
 

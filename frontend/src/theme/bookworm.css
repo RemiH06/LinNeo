@@ -78,11 +78,18 @@ body.dark .bookworm-scope {
   border-radius: var(--bw-radius); background: var(--bw-bg2); color: var(--bw-text2); cursor: pointer; letter-spacing: .04em;
 }
 .bookworm-scope .bw-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }
+.bookworm-scope .bw-btn:disabled { opacity: .35; cursor: not-allowed; }
+.bookworm-scope .bw-btn:disabled:hover { border-color: var(--bw-border); color: var(--bw-text2); }
 .bookworm-scope .bw-map { border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; margin: 12px 0; }
 
 /* ── Layout de 3 zonas en TaxonNode ── */
 .bookworm-scope .bw-header { margin-top: 18px; margin-bottom: 20px; }
 .bookworm-scope .bw-header-title h1 { margin: 2px 0 4px; }
+
+/* header con 2 columnas: titulo+stats a la izquierda, botones de vistas a la derecha */
+.bookworm-scope .bw-header-2col { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+.bookworm-scope .bw-altviews { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.bookworm-scope .bw-altview-btn { display: flex; align-items: center; gap: 8px; justify-content: flex-start; min-width: 140px; }
 
 /* header de SearchResults: titulo+contador a la izquierda, filtros a la derecha */
 .bookworm-scope .sr-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
@@ -126,3 +133,28 @@ body.dark .bookworm-scope {
 .bookworm-scope .sr-input:focus { outline: none; border-color: var(--bw-accent); }
 .bookworm-scope .sr-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .bookworm-scope .sr-card { padding: 8px 12px; font-size: 13px; }
+
+/* ── TaxonGallery (mosaico tetris) ── */
+.bookworm-scope .tg-grid {
+  display: grid; margin-top: 16px;
+  justify-content: center;
+}
+.bookworm-scope .tg-block {
+  position: relative; display: block; overflow: hidden;
+  border: 2px solid var(--bw-border); border-radius: var(--bw-radius);
+  background: var(--bw-bg2); text-decoration: none;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.bookworm-scope .tg-block:hover { transform: scale(1.02); box-shadow: 0 4px 16px rgba(0,0,0,.25); z-index: 2; }
+.bookworm-scope .tg-block img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bookworm-scope .tg-block-label {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1;
+  font-size: 11px; font-style: italic; color: #fff; padding: 4px 6px;
+  background: linear-gradient(to top, rgba(0,0,0,.65), transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bookworm-scope .tg-block-count {
+  position: absolute; top: 4px; right: 4px; z-index: 1;
+  font-family: var(--bw-mono); font-size: 10px; color: #fff;
+  background: rgba(0,0,0,.55); border-radius: 8px; padding: 1px 6px;
+}

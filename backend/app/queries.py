@@ -285,14 +285,15 @@ def get_taxon_node(rank: str, key: int, child_limit: int = 500):
              count(DISTINCT d)  AS n_desc,
              count(DISTINCT et) AS n_etym,
              count(DISTINCT co) AS n_country,
-             head(collect(DISTINCT mi.url)) AS image,
+             collect(DISTINCT mi.url)[0..5] AS images,
              collect(DISTINCT co.key) AS countries
         RETURN collect({{
             name: coalesce(c.canonical_name, c.scientific_name),
             key: c.species_key,
             rank: 'species',
             conservation: c.conservation_overall_code,
-            image: image,
+            image: images[0],
+            images: images,
             common_names: c.commonNames,
             countries: countries,
             flags: {{images: n_img, sounds: n_snd, descriptions: n_desc, etymology: n_etym, countries: n_country}}
