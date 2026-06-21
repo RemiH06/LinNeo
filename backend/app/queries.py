@@ -419,11 +419,239 @@ def get_taxon_gallery(rank: str, key: int, limit: int = 250):
     """
     rows = run_query(cypher, {"key": key, "limit": limit})
     species = [r["sp"] for r in rows if r.get("sp") and r["sp"].get("name")]
+
+    total_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        WHERE EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type: 'image'}}) }}
+        RETURN count(DISTINCT s) AS total
+    """, {"key": key})
+    total_with_image = total_row[0]["total"] if total_row else len(species)
+
     return {
         "rank": rank, "key": key,
         "name": name_row[0]["name"],
         "kingdom": taxon_kingdom,
-        "species": species, "total": len(species),
+        "species": species,
+        "shown": len(species),
+        "total": total_with_image,
+    }
+
+
+def get_taxon_sound_tree(rank: str, key: int, limit: int = 250):
+    """
+    Arbol de navegacion para la vista de Sonidos: el taxon enfocado como
+    raiz, con los niveles taxonomicos intermedios REALES (genus, family,
+    etc.) como ramas, hasta llegar a las especies-hoja que SI tienen sonido.
+    A diferencia de get_taxon_gallery (lista plana), aqui se necesita la
+    jerarquia real para dibujar el arbol.
+
+    Solo se incluyen las ramas intermedias que llevan a alguna de las
+    especies-hoja seleccionadas (no se muestran ramas "vacias" del taxon que
+    no tengan ninguna especie con sonido entre las primeras `limit`).
+
+    Costo: primero se eligen hasta `limit` especies con sonido (EXISTS
+    barato, igual patron que la galeria); luego, SOLO para esas, se trae el
+    path completo desde la raiz. El recorrido caro (construir el arbol) se
+    hace sobre como maximo `limit` caminos, no sobre todo el taxon.
+    """
+    rank = rank.lower()
+    if rank not in RANK_LABEL:
+        return None
+    label, keyprop = RANK_LABEL[rank]
+
+    name_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})
+        RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
+        LIMIT 1
+    """, {"key": key})
+    if not name_row:
+        return None
+    if rank == "kingdom":
+        taxon_kingdom = name_row[0]["name"]
+    elif name_row[0]["kingdom"]:
+        taxon_kingdom = name_row[0]["kingdom"]
+    else:
+        anc_rows = run_query(f"""
+            MATCH (k:Kingdom)-[:HAS_CHILD*]->(n:{label} {{{keyprop}: $key}})
+            RETURN coalesce(k.canonical_name, k.name) AS kname
+            LIMIT 1
+        """, {"key": key})
+        taxon_kingdom = anc_rows[0]["kname"] if anc_rows else None
+
+    # 1) elegir hasta `limit` especies con sonido (EXISTS barato, no trae el
+    # path todavia, asi el filtro pesado solo corre una vez sobre el universo
+    # completo de descendientes, no `limit` veces).
+    leaf_rows = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        WHERE EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type: 'sound'}}) }}
+        WITH s
+        ORDER BY coalesce(s.canonical_name, s.scientific_name)
+        LIMIT $limit
+        RETURN s.species_key AS skey
+    """, {"key": key, "limit": limit})
+    leaf_keys = [r["skey"] for r in leaf_rows]
+    total_with_sound_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        WHERE EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type: 'sound'}}) }}
+        RETURN count(DISTINCT s) AS total
+    """, {"key": key})
+    total_with_sound = total_with_sound_row[0]["total"] if total_with_sound_row else 0
+
+    if not leaf_keys:
+        return {
+            "rank": rank, "key": key, "name": name_row[0]["name"], "kingdom": taxon_kingdom,
+            "nodes": [], "edges": [], "total_with_sound": 0,
+        }
+
+    # 2) para esas especies, traer el path completo desde la raiz + datos de
+    # cada especie-hoja (sonidos, imagen, nombre comun) en la misma pasada.
+    path_cypher = f"""
+    MATCH (n:{label} {{{keyprop}: $key}}), (s:Species)
+    WHERE s.species_key IN $leaf_keys
+    MATCH path = (n)-[:HAS_CHILD*]->(s)
+    WITH s, nodes(path) AS chain
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(snd:Media) WHERE snd.media_type = 'sound'
+    OPTIONAL MATCH (s)-[:HAS_MEDIA]->(img:Media) WHERE img.media_type = 'image'
+    WITH s, chain, collect(DISTINCT snd.url) AS sounds, head(collect(DISTINCT img.url)) AS image
+    RETURN
+        [x IN chain | {{
+            rank: toLower(labels(x)[0]),
+            name: coalesce(x.canonical_name, x.name, x.scientific_name),
+            key: coalesce(x.domain_key, x.kingdom_key, x.phylum_key, x.class_key, x.order_key, x.family_key, x.genus_key, x.species_key)
+        }}] AS chain_info,
+        s.species_key AS leaf_key,
+        s.kingdom AS leaf_kingdom,
+        s.commonNames AS common_names,
+        image,
+        sounds
+    """
+    prows = run_query(path_cypher, {"key": key, "leaf_keys": leaf_keys})
+
+    # 3) deduplicar nodos/edges en Python: cada chain_info es la cadena
+    # completa raiz->hoja; las ramas compartidas (mismo genus/family, etc.)
+    # solo deben aparecer una vez en el arbol final.
+    nodes_by_id = {}
+    edges_seen = set()
+    edges = []
+    leaf_extra = {}  # leaf_key -> {sounds, image, common_names, kingdom}
+
+    for row in prows:
+        chain = row["chain_info"]
+        if not chain:
+            continue
+        prev_id = None
+        for node_info in chain:
+            if not node_info.get("name"):
+                continue
+            node_id = f"{node_info['rank']}:{node_info['key']}"
+            if node_id not in nodes_by_id:
+                nodes_by_id[node_id] = {
+                    "id": node_id, "name": node_info["name"],
+                    "rank": node_info["rank"], "key": node_info["key"],
+                }
+            if prev_id is not None:
+                edge_key = (prev_id, node_id)
+                if edge_key not in edges_seen:
+                    edges_seen.add(edge_key)
+                    edges.append({"source": prev_id, "target": node_id})
+            prev_id = node_id
+
+        leaf_id = f"species:{row['leaf_key']}"
+        leaf_extra[leaf_id] = {
+            "kingdom": row.get("leaf_kingdom"),
+            "common_names": row.get("common_names"),
+            "image": row.get("image"),
+            "sounds": row.get("sounds") or [],
+        }
+
+    # fusionar la info extra de cada hoja en su nodo correspondiente
+    for leaf_id, extra in leaf_extra.items():
+        if leaf_id in nodes_by_id:
+            nodes_by_id[leaf_id].update(extra)
+
+    # 4) para cada nodo intermedio del arbol (todo excepto las hojas-especie),
+    # traer SUS HERMANOS REALES que llevan a alguna especie con sonido --
+    # no solo los que ya estan en el arbol (porque llevan a una de las 250
+    # hojas seleccionadas originalmente), sino tambien otros hermanos reales
+    # que el frontend puede mostrar al hacer "reroll" de ese nodo. Se excluyen
+    # las ramas sin NINGUNA especie con sonido (un reroll nunca debe llevar a
+    # un callejon sin salida ni a una hoja "vacia"). Se agrupa por (rank,
+    # label) para hacer una sola query por nivel en vez de una por nodo.
+    intermediate_ids = [nid for nid in nodes_by_id if not nid.startswith("species:")]
+    children_pool = {}  # node_id -> [{id, name, rank, key}, ...] (todos los hijos reales)
+    by_rank = {}
+    for nid in intermediate_ids:
+        node_rank = nodes_by_id[nid]["rank"]
+        by_rank.setdefault(node_rank, []).append(nodes_by_id[nid]["key"])
+
+    for parent_rank, parent_keys in by_rank.items():
+        if parent_rank not in RANK_LABEL or parent_rank == "species":
+            continue
+        parent_label, parent_keyprop = RANK_LABEL[parent_rank]
+        child_rank = CHILD_RANK.get(parent_rank)
+        if not child_rank:
+            continue
+        child_label, child_keyprop = RANK_LABEL[child_rank]
+
+        if child_rank == "species":
+            # nivel justo antes de las hojas: SOLO especies que SI tienen
+            # sonido real entran al pool (asi el reroll nunca muestra una
+            # hoja "vacia" sin sonido ni imagen, que se sentia como un bug).
+            # Se enriquece cada una con sus propios sonidos/imagen/kingdom.
+            rows = run_query(f"""
+                MATCH (p:{parent_label})-[:HAS_CHILD]->(c:Species)
+                WHERE p.{parent_keyprop} IN $pkeys
+                  AND EXISTS {{ (c)-[:HAS_MEDIA]->(:Media {{media_type: 'sound'}}) }}
+                OPTIONAL MATCH (c)-[:HAS_MEDIA]->(snd:Media) WHERE snd.media_type = 'sound'
+                OPTIONAL MATCH (c)-[:HAS_MEDIA]->(img:Media) WHERE img.media_type = 'image'
+                WITH p, c, collect(DISTINCT snd.url) AS sounds, head(collect(DISTINCT img.url)) AS image
+                RETURN p.{parent_keyprop} AS pkey, c.species_key AS ckey,
+                       coalesce(c.canonical_name, c.scientific_name) AS cname,
+                       c.kingdom AS ckingdom, image, sounds
+                ORDER BY cname
+            """, {"pkeys": parent_keys})
+            for r in rows:
+                if not r.get("cname"):
+                    continue
+                parent_id = f"{parent_rank}:{r['pkey']}"
+                child_id = f"species:{r['ckey']}"
+                children_pool.setdefault(parent_id, []).append({
+                    "id": child_id, "name": r["cname"], "rank": "species", "key": r["ckey"],
+                    "kingdom": r.get("ckingdom"), "image": r.get("image"), "sounds": r.get("sounds") or [],
+                })
+            continue
+
+        rows = run_query(f"""
+            MATCH (p:{parent_label})-[:HAS_CHILD]->(c:{child_label})
+            WHERE p.{parent_keyprop} IN $pkeys
+              AND EXISTS {{
+                MATCH (c)-[:HAS_CHILD*]->(desc:Species)-[:HAS_MEDIA]->(m:Media)
+                WHERE m.media_type = 'sound'
+              }}
+            RETURN p.{parent_keyprop} AS pkey, c.{child_keyprop} AS ckey,
+                   coalesce(c.canonical_name, c.name, c.scientific_name) AS cname
+            ORDER BY cname
+        """, {"pkeys": parent_keys})
+        for r in rows:
+            if not r.get("cname"):
+                continue
+            parent_id = f"{parent_rank}:{r['pkey']}"
+            child_id = f"{child_rank}:{r['ckey']}"
+            children_pool.setdefault(parent_id, []).append({
+                "id": child_id, "name": r["cname"], "rank": child_rank, "key": r["ckey"],
+            })
+
+    root_id = f"{rank}:{key}"
+    return {
+        "rank": rank, "key": key,
+        "name": name_row[0]["name"],
+        "kingdom": taxon_kingdom,
+        "root_id": root_id,
+        "nodes": list(nodes_by_id.values()),
+        "edges": edges,
+        "children_pool": children_pool,
+        "total_with_sound": total_with_sound,
+        "shown_with_sound": len(leaf_keys),
     }
 
 

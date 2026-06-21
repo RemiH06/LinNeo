@@ -162,3 +162,86 @@ body.dark .bookworm-scope {
   font-family: var(--bw-mono); font-size: 10px; color: #fff;
   background: rgba(0,0,0,.55); border-radius: 8px; padding: 1px 6px;
 }
+
+/* ── SoundTree (arbol jerarquico de sonidos, horizontal: raiz a la
+   izquierda, crece hacia la derecha; las filas/hojas crecen hacia abajo sin
+   limite, la pagina scrollea verticalmente, nunca hace falta scroll
+   horizontal porque el ancho solo depende de la profundidad) ── */
+.bookworm-scope .st-svg { display: block; margin-top: 16px; }
+.bookworm-scope .st-node-mid { cursor: pointer; }
+.bookworm-scope .st-node-mid circle { transition: r .12s ease; }
+.bookworm-scope .st-node-mid:hover circle { r: 10; }
+.bookworm-scope .st-node-label {
+  font-size: 11px; font-family: var(--bw-serif); fill: var(--bw-text2);
+}
+.bookworm-scope .st-reroll { cursor: pointer; }
+.bookworm-scope .st-reroll circle { fill: var(--bw-bg3); stroke: var(--bw-border); stroke-width: 1; transition: stroke .12s ease; }
+.bookworm-scope .st-reroll text { fill: var(--bw-text2); }
+.bookworm-scope .st-reroll:hover circle { stroke: var(--bw-accent); }
+.bookworm-scope .st-reroll:hover text { fill: var(--bw-accent); }
+.bookworm-scope .st-leaf { cursor: pointer; }
+.bookworm-scope .st-leaf circle { transition: stroke-width .12s ease, filter .12s ease; }
+.bookworm-scope .st-leaf:hover circle { stroke-width: 4; filter: drop-shadow(0 0 6px var(--bw-accent)); }
+.bookworm-scope .st-leaf text:not(.st-leaf-label) { fill: var(--bw-text2); }
+.bookworm-scope .st-leaf-label {
+  font-size: 10px; font-style: italic; font-family: var(--bw-serif); fill: var(--bw-text);
+}
+.bookworm-scope .st-leaf-nosound { cursor: default; opacity: .45; }
+.bookworm-scope .st-leaf-nosound:hover circle { stroke-width: 2.5; filter: none; }
+
+/* ── SoundPlayerBox (caja flotante, esquina inferior derecha). Cada tab es
+   su propia tarjeta-reproductor independiente, apiladas verticalmente; la
+   caja crece hacia arriba con cada nueva tab, hasta un alto maximo con
+   scroll interno propio. Todas pueden sonar a la vez. ── */
+.bookworm-scope .spb-box {
+  position: fixed; right: 20px; bottom: 20px; z-index: 9000;
+  width: 300px; max-width: calc(100vw - 40px);
+  max-height: 75vh; overflow-y: auto;
+  font-family: var(--bw-serif); color: var(--bw-text);
+}
+.bookworm-scope .spb-list { display: flex; flex-direction: column; gap: 8px; }
+.bookworm-scope .spb-card {
+  display: flex; gap: 10px; padding: 10px;
+  background: var(--bw-bg2); border: 1px solid var(--bw-border); border-radius: var(--bw-radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  flex-shrink: 0;
+}
+.bookworm-scope .spb-disc {
+  position: relative; flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%;
+  overflow: hidden; cursor: pointer; background: var(--bw-bg3);
+  border: 3px solid var(--bw-bark);
+  display: flex; align-items: center; justify-content: center;
+}
+.bookworm-scope .spb-disc img { width: 100%; height: 100%; object-fit: cover; }
+.bookworm-scope .spb-disc-icon { font-size: 20px; color: var(--bw-text2); }
+.bookworm-scope .spb-disc.spinning { animation: spb-spin 3.5s linear infinite; }
+@keyframes spb-spin { to { transform: rotate(360deg); } }
+.bookworm-scope .spb-disc-playbtn {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #fff; background: rgba(0,0,0,.25); opacity: 0; transition: opacity .15s ease;
+}
+.bookworm-scope .spb-disc:hover .spb-disc-playbtn { opacity: 1; }
+
+.bookworm-scope .spb-info { flex: 1; min-width: 0; }
+.bookworm-scope .spb-info-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.bookworm-scope .spb-info-name { font-style: italic; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookworm-scope .spb-close { flex-shrink: 0; background: none; border: none; color: var(--bw-text2); cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
+.bookworm-scope .spb-close:hover { color: var(--bw-danger); }
+.bookworm-scope .spb-info-kingdom { font-size: 9px; color: var(--bw-text2); text-transform: uppercase; letter-spacing: .04em; }
+.bookworm-scope .spb-progress {
+  margin-top: 6px; height: 5px; border-radius: 3px; background: rgba(127,127,127,.25);
+  cursor: pointer; overflow: hidden;
+}
+.bookworm-scope .spb-progress-fill { height: 100%; background: var(--bw-accent); }
+.bookworm-scope .spb-controls-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.bookworm-scope .spb-volume { width: 56px; accent-color: var(--bw-accent); cursor: pointer; }
+.bookworm-scope .spb-detail-btn {
+  font-family: var(--bw-mono); font-size: 10px;
+  background: none; border: none; color: var(--bw-accent2); cursor: pointer; padding: 0;
+}
+.bookworm-scope .spb-detail-btn:hover { text-decoration: underline; }
+.bookworm-scope .spb-download-btn {
+  margin-left: auto; background: none; border: 1px solid var(--bw-border); border-radius: var(--bw-radius);
+  color: var(--bw-text2); cursor: pointer; font-size: 12px; padding: 2px 6px; line-height: 1;
+}
+.bookworm-scope .spb-download-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }

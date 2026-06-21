@@ -144,6 +144,18 @@ def taxon_gallery(rank: str, key: int, limit: int = Query(250, ge=1, le=500)):
     return gallery
 
 
+@app.get("/taxon/{rank}/{key}/sounds")
+def taxon_sound_tree(rank: str, key: int, limit: int = Query(250, ge=1, le=500)):
+    """
+    Arbol de navegacion (taxon enfocado como raiz + niveles intermedios
+    reales) hasta las especies con sonido, para la vista de Sonidos.
+    """
+    tree = queries.get_taxon_sound_tree(rank, key, limit)
+    if tree is None:
+        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
+    return tree
+
+
 # ── SHUI: grafo principal, ejemplos por reino, geografia ──
 
 @app.get("/kingdoms")

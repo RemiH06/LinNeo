@@ -104,8 +104,7 @@ export default function TaxonGallery() {
                 <div className="bw-rank">Galeria · {RANK_LABEL(data.rank)}</div>
                 <h1>{data.name}</h1>
                 <p className="bw-muted">
-                  {withImages.length} especie(s) con imagen.
-                  {data.total === 250 && ' Mostrando las primeras 250.'}
+                  Mostrando {data.shown} de {data.total} especie(s) con imagen.
                 </p>
               </div>
             </div>

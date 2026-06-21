@@ -14,6 +14,7 @@ import SearchResults from './pages/SearchResults'
 import MapExplorer from './pages/MapExplorer'
 import MapCountry from './pages/MapCountry'
 import TaxonGallery from './pages/TaxonGallery'
+import SoundTree from './pages/SoundTree'
 import ErrorBoundary from './components/ErrorBoundary'
 import { Callout } from './components/ui'
 
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="/" element={<ErrorBoundary><Shui /></ErrorBoundary>} />
             <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />
             <Route path="/taxon/:rank/:key/gallery" element={<ErrorBoundary><TaxonGallery /></ErrorBoundary>} />
+            <Route path="/taxon/:rank/:key/sounds" element={<ErrorBoundary><SoundTree /></ErrorBoundary>} />
             <Route path="/taxon/:rank/:key" element={<ErrorBoundary><TaxonPage /></ErrorBoundary>} />
             <Route path="/search" element={<ErrorBoundary><SearchResults /></ErrorBoundary>} />
             <Route path="/map/country/:code" element={<ErrorBoundary><MapCountry /></ErrorBoundary>} />
