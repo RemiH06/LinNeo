@@ -655,6 +655,182 @@ def get_taxon_sound_tree(rank: str, key: int, limit: int = 250):
     }
 
 
+def get_taxon_infographic(rank: str, key: int, candidate_limit: int = 500):
+    """
+    Datos agregados para el poster/infografia de un taxon: stats numericas
+    (especies, paises, imagenes, sonidos, descripciones), desglose por
+    estado de conservacion, desglose por reino (relevante en Domain, que
+    agrupa varios), paises para el mini-mapa, y hasta 3 especies
+    "destacadas" elegidas ABSOLUTAMENTE AL AZAR (no por mayor puntaje),
+    de FILOS DISTINTOS entre si cuando es posible, con el unico requisito de
+    tener al menos un punto de contenido (imagen, sonido, descripcion o
+    nombre comun). Si el taxon abarca un solo filo (ej. el propio Phylum
+    enfocado), se permite repetir filo entre las 3 antes que mostrar menos
+    de 3 especies.
+
+    Para que el costo sea predecible en taxones gigantes, el universo de
+    candidatas por filo se limita a las primeras `candidate_limit` especies
+    en orden alfabetico de ESE filo (no del taxon completo) antes de
+    calcular el score. Las stats agregadas (conteos, paises, conservacion,
+    reino) si recorren TODAS las especies, sin ese limite, porque son
+    agregaciones simples (count/collect), mucho mas baratas que puntuar.
+    """
+    rank = rank.lower()
+    if rank not in RANK_LABEL:
+        return None
+    label, keyprop = RANK_LABEL[rank]
+
+    name_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})
+        RETURN coalesce(n.canonical_name, n.name, n.scientific_name) AS name, n.kingdom AS kingdom
+        LIMIT 1
+    """, {"key": key})
+    if not name_row:
+        return None
+    if rank == "kingdom":
+        taxon_kingdom = name_row[0]["name"]
+    elif name_row[0]["kingdom"]:
+        taxon_kingdom = name_row[0]["kingdom"]
+    else:
+        anc_rows = run_query(f"""
+            MATCH (k:Kingdom)-[:HAS_CHILD*]->(n:{label} {{{keyprop}: $key}})
+            RETURN coalesce(k.canonical_name, k.name) AS kname
+            LIMIT 1
+        """, {"key": key})
+        taxon_kingdom = anc_rows[0]["kname"] if anc_rows else None
+
+    # Stats agregadas: recorren TODAS las especies descendientes (agregacion
+    # simple, barata) -- conteo total, imagenes/sonidos/descripciones con
+    # EXISTS. Cypher puro, sin APOC (no se confirmo que este instalado).
+    stats_row = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        RETURN
+            count(DISTINCT s) AS n_species,
+            count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'image'}}) }} THEN s END) AS n_img,
+            count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_MEDIA]->(:Media {{media_type:'sound'}}) }} THEN s END) AS n_snd,
+            count(DISTINCT CASE WHEN EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }} THEN s END) AS n_desc
+    """, {"key": key})
+    stats = stats_row[0] if stats_row else {"n_species": 0, "n_img": 0, "n_snd": 0, "n_desc": 0}
+
+    # paises agregados (deduplicados): consulta aparte, mas simple que
+    # intentar aplanar listas dentro de la query de stats.
+    countries_rows = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(:Species)-[:FOUND_IN]->(co:Country)
+        RETURN collect(DISTINCT co.key) AS countries
+    """, {"key": key})
+    all_countries = countries_rows[0]["countries"] if countries_rows else []
+
+    # desglose por estado de conservacion
+    conservation_rows = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        WHERE s.conservation_overall_code IS NOT NULL
+        RETURN s.conservation_overall_code AS code, count(DISTINCT s) AS n
+        ORDER BY n DESC
+    """, {"key": key})
+
+    # desglose por reino (relevante sobre todo para Domain, que agrupa varios)
+    kingdom_rows = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*]->(s:Species)
+        WHERE s.kingdom IS NOT NULL
+        RETURN s.kingdom AS kingdom, count(DISTINCT s) AS n
+        ORDER BY n DESC
+    """, {"key": key})
+
+    # especies destacadas: ahora ABSOLUTAMENTE AL AZAR (no por mayor puntaje),
+    # con un minimo de calidad (score > 0, al menos un tipo de contenido) y
+    # priorizando filos DISTINTOS entre las 3 elegidas. El azar real vive en
+    # Python (random.choice), no en Cypher, por la misma razon que el pot de
+    # reinos de Shui: evita depender de sintaxis de indexacion dinamica de
+    # listas que no se pudo confirmar con certeza en sesiones anteriores.
+    #
+    # Para agrupar por filo sin un MATCH costoso por candidata, se parte de
+    # los Phylum descendientes del taxon (normalmente pocos, incluso en
+    # taxones grandes) y se bajan sus especies candidatas con score, en vez
+    # de subir desde cada especie hacia su ancestro.
+    candidates_by_phylum_rows = run_query(f"""
+        MATCH (n:{label} {{{keyprop}: $key}})-[:HAS_CHILD*0..]->(ph:Phylum)
+        CALL (ph) {{
+            MATCH (ph)-[:HAS_CHILD*]->(s:Species)
+            WHERE EXISTS {{ (s)-[:HAS_MEDIA]->(:Media) }}
+               OR EXISTS {{ (s)-[:HAS_DESCRIPTION]->(:Description) }}
+               OR size(coalesce(s.commonNames, [])) > 0
+            WITH s
+            ORDER BY coalesce(s.canonical_name, s.scientific_name)
+            LIMIT $candidate_limit
+            OPTIONAL MATCH (s)-[:HAS_MEDIA]->(mi:Media) WHERE mi.media_type = 'image'
+            OPTIONAL MATCH (s)-[:HAS_MEDIA]->(ms:Media) WHERE ms.media_type = 'sound'
+            OPTIONAL MATCH (s)-[:HAS_DESCRIPTION]->(d:Description)
+            WITH s,
+                 count(DISTINCT mi) AS n_img, count(DISTINCT ms) AS n_snd, count(DISTINCT d) AS n_desc,
+                 head(collect(DISTINCT mi.url)) AS image,
+                 (CASE WHEN size(coalesce(s.commonNames, [])) > 0 THEN 1 ELSE 0 END) AS has_common
+            WITH s, image, n_img, n_snd, n_desc, has_common,
+                 (CASE WHEN n_img > 0 THEN 1 ELSE 0 END
+                  + CASE WHEN n_snd > 0 THEN 1 ELSE 0 END
+                  + CASE WHEN n_desc > 0 THEN 1 ELSE 0 END
+                  + has_common) AS score
+            WHERE score > 0
+            RETURN s, image, n_img, n_snd, n_desc, score
+        }}
+        RETURN coalesce(ph.canonical_name, ph.name) AS phylum,
+               coalesce(s.canonical_name, s.scientific_name) AS name, s.species_key AS skey,
+               s.kingdom AS kingdom, s.commonNames AS common_names, s.conservation_overall_code AS conservation,
+               image, n_img AS images, n_snd AS sounds, n_desc AS descriptions, score
+    """, {"key": key, "candidate_limit": candidate_limit})
+
+    # agrupar candidatas por filo real
+    by_phylum = {}
+    for r in candidates_by_phylum_rows:
+        by_phylum.setdefault(r["phylum"], []).append(r)
+
+    # elegir 3 al azar: un filo al azar (sin repetir mientras haya opciones
+    # distintas), y dentro de ese filo una especie al azar.
+    phylum_pool = list(by_phylum.keys())
+    random.shuffle(phylum_pool)
+    used_phyla = []
+    featured_raw = []
+    attempts = 0
+    while len(featured_raw) < 3 and attempts < 12:
+        attempts += 1
+        # prioriza filos aun no usados; si se agotan, permite repetir
+        available = [p for p in phylum_pool if p not in used_phyla] or phylum_pool
+        if not available:
+            break
+        chosen_phylum = random.choice(available)
+        candidates = by_phylum.get(chosen_phylum, [])
+        # evitar elegir la misma especie dos veces
+        already_picked_keys = {f["skey"] for f in featured_raw}
+        candidates = [c for c in candidates if c["skey"] not in already_picked_keys]
+        if not candidates:
+            phylum_pool = [p for p in phylum_pool if p != chosen_phylum]
+            continue
+        pick = random.choice(candidates)
+        featured_raw.append(pick)
+        used_phyla.append(chosen_phylum)
+
+    featured = [{
+        "name": r["name"], "key": r["skey"], "kingdom": r.get("kingdom"),
+        "common_names": r.get("common_names") or [], "conservation": r.get("conservation"),
+        "image": r.get("image"),
+        "flags": {"images": r["images"], "sounds": r["sounds"], "descriptions": r["descriptions"]},
+        "score": r["score"],
+    } for r in featured_raw]
+
+    return {
+        "rank": rank, "key": key,
+        "name": name_row[0]["name"],
+        "kingdom": taxon_kingdom,
+        "species_count": stats.get("n_species", 0),
+        "images_count": stats.get("n_img", 0),
+        "sounds_count": stats.get("n_snd", 0),
+        "descriptions_count": stats.get("n_desc", 0),
+        "countries": all_countries,
+        "conservation": [{"code": r["code"], "count": r["n"]} for r in conservation_rows],
+        "by_kingdom": [{"kingdom": r["kingdom"], "count": r["n"]} for r in kingdom_rows],
+        "featured": featured,
+    }
+
+
 def filter_species(kingdom: str = None, country: str = None, habit: str = None, limit: int = 50):
     conditions = []
     params = {"limit": limit}

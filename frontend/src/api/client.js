@@ -17,6 +17,7 @@ export const api = {
   taxon: (rank, key) => get(`/taxon/${rank}/${key}`),
   taxonGallery: (rank, key, limit = 250) => get(`/taxon/${rank}/${key}/gallery?limit=${limit}`),
   taxonSounds: (rank, key, limit = 250) => get(`/taxon/${rank}/${key}/sounds?limit=${limit}`),
+  taxonInfographic: (rank, key) => get(`/taxon/${rank}/${key}/infographic`),
   filter: (params) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== '')

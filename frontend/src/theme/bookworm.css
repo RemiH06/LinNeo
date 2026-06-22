@@ -245,3 +245,57 @@ body.dark .bookworm-scope {
   color: var(--bw-text2); cursor: pointer; font-size: 12px; padding: 2px 6px; line-height: 1;
 }
 .bookworm-scope .spb-download-btn:hover { border-color: var(--bw-accent); color: var(--bw-accent); }
+
+/* ── TaxonInfographic (poster, una sola pantalla sin scroll) ── */
+.bookworm-scope .ti-poster-scope { overflow: hidden; height: 100vh; }
+.bookworm-scope .ti-poster-page { padding: 24px 40px; max-height: 100vh; box-sizing: border-box; }
+.bookworm-scope .ti-poster { display: flex; flex-direction: column; gap: 14px; }
+
+.bookworm-scope .ti-head { text-align: center; margin-bottom: 4px; }
+.bookworm-scope .ti-head h1 { margin: 2px 0 6px; }
+.bookworm-scope .ti-kingdom-tag {
+  display: inline-block; font-family: var(--bw-mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: .08em; border: 1px solid; border-radius: 12px; padding: 2px 10px;
+}
+
+.bookworm-scope .ti-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.bookworm-scope .ti-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.bookworm-scope .ti-stats { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.bookworm-scope .ti-stat { text-align: center; flex: 1; min-width: 60px; }
+.bookworm-scope .ti-stat-val { font-family: var(--bw-mono); font-size: 22px; font-weight: 700; color: var(--bw-accent); line-height: 1; }
+.bookworm-scope .ti-stat-lbl { font-family: var(--bw-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .06em; color: var(--bw-text2); margin-top: 2px; }
+
+.bookworm-scope .ti-map { border: 1px solid var(--bw-border); border-radius: var(--bw-radius); overflow: hidden; }
+
+.bookworm-scope .ti-block h3 { margin: 0 0 8px; }
+.bookworm-scope .ti-bars { display: flex; flex-direction: column; gap: 5px; }
+.bookworm-scope .ti-bar-row { display: flex; align-items: center; gap: 8px; }
+.bookworm-scope .ti-bar-code { font-family: var(--bw-mono); font-size: 10px; font-weight: 700; min-width: 28px; text-align: right; }
+.bookworm-scope .ti-bar-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(127,127,127,.18); overflow: hidden; }
+.bookworm-scope .ti-bar-fill { height: 100%; border-radius: 4px; }
+.bookworm-scope .ti-bar-n { font-family: var(--bw-mono); font-size: 10px; color: var(--bw-text2); min-width: 24px; text-align: right; }
+.bookworm-scope .ti-small { font-size: 10px; margin-top: 6px; }
+
+.bookworm-scope .ti-featured h3 { margin: 0 0 10px; }
+.bookworm-scope .ti-featured-row { display: flex; justify-content: center; gap: 28px; }
+.bookworm-scope .ti-featured-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; width: 120px;
+  text-decoration: none; color: var(--bw-text); cursor: pointer; transition: transform .15s ease;
+}
+.bookworm-scope .ti-featured-card:hover { transform: translateY(-3px); }
+.bookworm-scope .ti-featured-disc {
+  width: 72px; height: 72px; border-radius: 50%; overflow: hidden;
+  border: 3px solid var(--bw-border); background: var(--bw-bg3);
+  display: flex; align-items: center; justify-content: center;
+}
+.bookworm-scope .ti-featured-disc img { width: 100%; height: 100%; object-fit: cover; }
+.bookworm-scope .ti-featured-icon { font-size: 24px; color: var(--bw-text2); }
+.bookworm-scope .ti-featured-name { font-style: italic; font-size: 12px; text-align: center; }
+
+@media (max-width: 760px) {
+  .bookworm-scope .ti-poster-scope { height: auto; overflow: visible; }
+  .bookworm-scope .ti-poster-page { max-height: none; }
+  .bookworm-scope .ti-grid { grid-template-columns: 1fr; }
+  .bookworm-scope .ti-featured-row { flex-wrap: wrap; }
+}

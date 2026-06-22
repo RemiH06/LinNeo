@@ -156,6 +156,18 @@ def taxon_sound_tree(rank: str, key: int, limit: int = Query(250, ge=1, le=500))
     return tree
 
 
+@app.get("/taxon/{rank}/{key}/infographic")
+def taxon_infographic(rank: str, key: int, candidate_limit: int = Query(500, ge=1, le=2000)):
+    """
+    Datos agregados (stats, conservacion, reino, paises, especies
+    destacadas) para el poster/infografia de un taxon.
+    """
+    data = queries.get_taxon_infographic(rank, key, candidate_limit)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
+    return data
+
+
 # ── SHUI: grafo principal, ejemplos por reino, geografia ──
 
 @app.get("/kingdoms")
