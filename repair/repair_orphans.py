@@ -14,8 +14,16 @@ Por eso:
   - Al PADRE efectivo se le busca por key (si es family/genus, donde key==GBIF) o
     por NOMBRE (si es kingdom/phylum/class/order), con salvaguarda de unicidad.
 
+FILTRO DE REINO (v2): el CSV de entrada puede traer una columna opcional
+'kingdom' (el reino real del huerfano, deducido de sus especies en el grafo).
+Cuando el fallback por nombre encuentra MAS DE UN taxonID candidato en el
+backbone, se filtra por ese kingdom antes de rendirse; si eso deja EXACTAMENTE
+uno, se resuelve. Si no hay columna kingdom, o el filtro no reduce a 1, el
+nodo sigue cayendo en 'nombre ambiguo en TSV' como antes (ningun cambio de
+comportamiento para quien no provea kingdom).
+
 ENTRADA:
-  --orphans : CSV del grafo con columnas graphkey,name,rank
+  --orphans : CSV del grafo con columnas graphkey,name,rank[,kingdom]
   --taxon   : Taxon.tsv del backbone
 
 SALIDA en --out (default biodiversity_data/orphan_csv):
@@ -52,7 +60,7 @@ RANK_ORDER = ['class', 'order', 'family', 'genus', 'species']
 
 def col_idx(header):
     want = ('taxonID', 'parentNameUsageID', 'taxonRank', 'taxonomicStatus',
-            'canonicalName', 'scientificName')
+            'canonicalName', 'scientificName', 'kingdom')
     idx = {n: header.index(n) for n in want if n in header}
     need = ['taxonID', 'parentNameUsageID', 'taxonRank']
     missing = [c for c in need if c not in idx]
@@ -87,19 +95,22 @@ def main():
     os.makedirs(args.out, exist_ok=True)
 
     # ---- Cargar huerfanos del grafo ----
-    orphan_id = {}        # gbifid(int) -> (graphkey, name, rank) para family/genus/species
-    orphan_name = {}      # (name, rank) -> graphkey                para order/class/phylum
+    orphan_id = {}        # gbifid(int) -> (graphkey, name, rank, kingdom) para family/genus/species
+    orphan_name = {}      # (name, rank) -> (graphkey, kingdom)            para order/class/phylum
     name_keys = set()
     orphan_names_set = set()   # (name,rank) de TODOS los huerfanos (para fallback por nombre)
     species_gbifids = set()
     n_orphans = 0
     discarded = 0
+    has_kingdom_col = False
     with open(args.orphans, encoding='utf-8-sig', newline='') as f:
         r = csv.DictReader(f)
+        has_kingdom_col = r.fieldnames is not None and 'kingdom' in r.fieldnames
         for row in r:
             gk = (row.get('graphkey') or '').strip()
             name = (row.get('name') or '').strip()
             rank = (row.get('rank') or '').strip().lower()
+            kg = (row.get('kingdom') or '').strip() if has_kingdom_col else ''
             if rank not in RANK_META:
                 discarded += 1
                 continue
@@ -111,24 +122,27 @@ def main():
                 if gbid is None:
                     discarded += 1
                     continue
-                orphan_id[gbid] = (gk, name, rank)
+                orphan_id[gbid] = (gk, name, rank, kg)
                 if rank == 'species':
                     species_gbifids.add(gbid)
             else:  # order/class/phylum: key propia
-                orphan_name[(name, rank)] = gk
+                orphan_name[(name, rank)] = (gk, kg)
                 name_keys.add((name, rank))
     print(f"Huerfanos leidos: {n_orphans:,} "
           f"(por id: {len(orphan_id):,} | por nombre: {len(orphan_name):,} "
-          f"| descartados: {discarded:,})")
+          f"| descartados: {discarded:,})"
+          f"{' | columna kingdom presente' if has_kingdom_col else ' | sin columna kingdom'}")
 
     # ---- UNA pasada del TSV: mapa ligero (sin especies) ----
     with open(args.taxon, encoding='utf-8') as f:
         header = f.readline().rstrip('\r\n').split('\t')
     idx = col_idx(header)
+    has_kingdom_in_taxon = 'kingdom' in idx
 
     tid_parent = {}                  # tid -> parentID
     tid_rank = {}                    # tid -> rank
     tid_name = {}                    # tid -> nombre (rangos no-species)
+    tid_kingdom = {}                 # tid -> kingdom (solo para los que necesitamos desambiguar)
     orphan_species_parent = {}       # species huerfana -> parentID
     name_to_tids = defaultdict(set)  # (name,rank) -> {tid}  para order/class huerfanos
     n_read = 0
@@ -156,8 +170,12 @@ def main():
             if orphan_names_set:
                 if (cname, rank) in orphan_names_set:
                     name_to_tids[(cname, rank)].add(tid)
+                    if has_kingdom_in_taxon:
+                        tid_kingdom[tid] = get(parts, idx, 'kingdom')
                 elif (sname, rank) in orphan_names_set:
                     name_to_tids[(sname, rank)].add(tid)
+                    if has_kingdom_in_taxon:
+                        tid_kingdom[tid] = get(parts, idx, 'kingdom')
 
     # ---- Subir la cadena hasta el primer ancestro de rango principal ----
     def effective_parent(start_pid):
@@ -173,6 +191,7 @@ def main():
     links = []
     unresolved = []
     rescued_by_name = 0
+    rescued_by_kingdom = 0
 
     def emit(gk, cname, crank, start_pid):
         if not start_pid:
@@ -190,18 +209,23 @@ def main():
             return
         links.append((gk, cname, crank, pe, pname, prank))
 
-    def start_by_name(name, rank):
-        """Fallback: localizar el taxon por nombre+rango en el TSV (unico) y
-        devolver su parentID. Devuelve (start, motivo_error)."""
+    def start_by_name(name, rank, kingdom=''):
+        """Fallback: localizar el taxon por nombre+rango en el TSV. Si hay mas
+        de un candidato y se conoce el kingdom real del huerfano, filtra por
+        kingdom antes de rendirse. Devuelve (start, motivo_error, via_kingdom)."""
         tids = name_to_tids.get((name, rank), set())
         if len(tids) == 1:
-            return tid_parent.get(next(iter(tids))), None
+            return tid_parent.get(next(iter(tids))), None, False
         if len(tids) > 1:
-            return None, 'nombre ambiguo en TSV'
-        return None, None  # no hallado por nombre
+            if kingdom and has_kingdom_in_taxon:
+                filtrados = [t for t in tids if tid_kingdom.get(t) == kingdom]
+                if len(filtrados) == 1:
+                    return tid_parent.get(filtrados[0]), None, True
+            return None, 'nombre ambiguo en TSV', False
+        return None, None, False  # no hallado por nombre
 
     # family/genus/species huerfanos (por id; con fallback por nombre)
-    for gbid, (gk, name, rank) in orphan_id.items():
+    for gbid, (gk, name, rank, kg) in orphan_id.items():
         if rank == 'species':
             start = orphan_species_parent.get(gbid)
             if start is None:
@@ -211,7 +235,7 @@ def main():
             start = tid_parent[gbid]
         else:
             # la key del grafo no esta en el backbone -> intentar por nombre
-            start, err = start_by_name(name, rank)
+            start, err, via_kg = start_by_name(name, rank, kg)
             if start is None:
                 if err:
                     unresolved.append((gk, name, rank, '', err))
@@ -220,17 +244,22 @@ def main():
                                        f'{rank} no hallado (ni por id ni por nombre)'))
                 continue
             rescued_by_name += 1
+            if via_kg:
+                rescued_by_kingdom += 1
         emit(gk, name, rank, start)
 
     # order/class/phylum huerfanos (por nombre)
-    for k, gk in orphan_name.items():
+    for k, v in orphan_name.items():
         name, rank = k
-        start, err = start_by_name(name, rank)
+        gk, kg = v
+        start, err, via_kg = start_by_name(name, rank, kg)
         if start is None and err is None and k in name_keys:
             unresolved.append((gk, name, rank, '', 'nombre no hallado en TSV'))
         elif err:
             unresolved.append((gk, name, rank, '', err))
         else:
+            if via_kg:
+                rescued_by_kingdom += 1
             emit(gk, name, rank, start)
 
     # ---- Escribir orphan_links.csv ----
@@ -257,7 +286,8 @@ def main():
         for m, n in sorted(mot.items(), key=lambda x: -x[1]):
             print(f"    {n:,}  {m}")
     if rescued_by_name:
-        print(f"Rescatados por nombre (key no estaba en el TSV): {rescued_by_name:,}")
+        print(f"Rescatados por nombre (key no estaba en el TSV): {rescued_by_name:,}"
+              f" (de los cuales por filtro de kingdom: {rescued_by_kingdom:,})")
 
     # ---- Generar repair_orphans.cypher ----
     combos = sorted({(c[2], c[5]) for c in links},
