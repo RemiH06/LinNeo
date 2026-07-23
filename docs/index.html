@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinNeo — Technical documentation</title>
+<style>
+  :root{
+    --abyss:#081c28;
+    --deep:#0d2634;
+    --panel:#0f2a38;
+    --line:#1c3f4d;
+    --line-soft:#153541;
+    --ink:#e2f0ee;
+    --ink-dim:#93b0b4;
+    --ink-faint:#63848a;
+    --turq:#2fe2d4;
+    --turq-deep:#0fb5aa;
+    --sand:#e8c56a;
+    --rose:#ff6f8a;
+    --glass:rgba(210,245,244,.28);
+    --code-bg:#0a1c25;
+    --row-hover:#0c2029;
+    --mono:ui-monospace,"Cascadia Code","Fira Code","JetBrains Mono",Consolas,monospace;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  }
+  /* ---- dark mode / abyssal ---- */
+  body.dark{
+    --abyss:#020608;
+    --deep:#050d13;
+    --panel:#081119;
+    --line:#152430;
+    --line-soft:#0d1922;
+    --ink:#cdeaf0;
+    --ink-dim:#5f828c;
+    --ink-faint:#3c5860;
+    --turq:#c060ff;
+    --turq-deep:#8a3fe0;
+    --sand:#ffd15c;
+    --rose:#ff5566;
+    --glass:rgba(2,6,10,.38);
+    --code-bg:#080d14;
+    --row-hover:#0a121c;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--abyss);color:var(--ink);
+    font-family:var(--serif);font-size:17px;line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+    transition:background .6s ease,color .6s ease;
+  }
+
+  /* ---- animated background layers ---- */
+  #sh-bg,#sh-rays,#sh-particles{position:fixed;inset:0;pointer-events:none}
+  #sh-bg{z-index:0}
+  #sh-rays{z-index:1;opacity:.85}
+  #sh-particles{z-index:2;opacity:.85}
+  .sh-glass{
+    position:fixed;inset:0;z-index:3;pointer-events:none;
+    background:var(--glass);
+    backdrop-filter:blur(18px) saturate(115%);
+    -webkit-backdrop-filter:blur(18px) saturate(115%);
+    transition:background .6s ease;
+  }
+
+  .wrap{position:relative;z-index:10;display:grid;grid-template-columns:280px 1fr;gap:0;max-width:1320px;margin:0 auto}
+
+  /* ---- sidebar / rank ladder ---- */
+  .nav{
+    position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+    padding:34px 22px 60px;border-right:1px solid var(--line-soft);
+  }
+  .brand{font-family:var(--mono);font-size:22px;letter-spacing:.02em;color:var(--ink);font-weight:600}
+  .brand b{color:var(--turq)}
+  .brand .cur{color:var(--turq);animation:blink 1.3s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.brand .cur{animation:none}}
+  .brand-sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-faint);margin-top:6px}
+  .theme-toggle{
+    font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    margin-top:16px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;
+    background:transparent;color:var(--ink-dim);cursor:pointer;transition:border-color .2s,color .2s;
+  }
+  .theme-toggle:hover{border-color:var(--turq);color:var(--turq)}
+  .ladder{margin-top:22px;font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+  .ladder a{
+    display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink-dim);
+    padding:5px 0 5px 2px;border-left:2px solid transparent;padding-left:14px;margin-left:3px;
+    transition:color .2s,border-color .2s;
+  }
+  .ladder a .dot{width:7px;height:7px;border-radius:50%;background:var(--line);flex:0 0 auto;transition:background .2s,box-shadow .2s}
+  .ladder a:hover,.ladder a.active{color:var(--turq)}
+  .ladder a.active{border-left-color:var(--turq)}
+  .ladder a.active .dot{background:var(--turq);box-shadow:0 0 8px var(--turq)}
+  .ladder .rank{font-size:9px;color:var(--ink-faint);width:54px;flex:0 0 auto;text-transform:uppercase;letter-spacing:.1em}
+
+  /* ---- main ---- */
+  main{padding:54px 60px 120px;min-width:0}
+  .hero{border-bottom:1px solid var(--line-soft);padding-bottom:40px;margin-bottom:14px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--turq-deep)}
+  h1{font-size:54px;line-height:1.02;margin:18px 0 6px;font-weight:600;letter-spacing:-.01em}
+  .lede{font-size:20px;color:var(--ink-dim);max-width:62ch;margin:14px 0 0}
+  .spine{display:flex;flex-wrap:wrap;gap:0;margin:34px 0 0;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em}
+  .spine .step{display:flex;align-items:center;color:var(--ink-faint)}
+  .spine .step b{color:var(--ink);text-transform:uppercase;letter-spacing:.12em}
+  .spine .step::after{content:"→";margin:0 11px;color:var(--line)}
+  .spine .step:last-child::after{content:""}
+  .spine .step .d{width:8px;height:8px;border-radius:50%;margin-right:7px}
+
+  section{padding:46px 0 8px;border-top:1px solid var(--line-soft);scroll-margin-top:20px}
+  section:first-of-type{border-top:0}
+  .sec-tag{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--turq-deep)}
+  h2{font-size:32px;margin:8px 0 18px;font-weight:600;letter-spacing:-.005em}
+  h3{font-family:var(--mono);font-size:15px;letter-spacing:.04em;color:var(--turq);margin:30px 0 8px;font-weight:600}
+  h4{font-size:18px;margin:22px 0 6px;color:var(--ink)}
+  p{margin:12px 0;max-width:74ch}
+  a{color:var(--turq)}
+  strong{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);border:1px solid var(--line-soft);border-radius:5px;padding:1px 6px;color:var(--turq)}
+  pre{background:var(--deep);border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;margin:16px 0;
+      font-family:var(--mono);font-size:13px;line-height:1.55;color:var(--ink)}
+  pre code{background:none;border:0;padding:0;color:inherit;font-size:inherit}
+  .muted{color:var(--ink-dim)}
+  ul,ol{max-width:74ch;padding-left:22px}
+  li{margin:6px 0}
+  li::marker{color:var(--turq-deep)}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:18px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card h4{margin:0 0 6px;font-family:var(--mono);font-size:13px;letter-spacing:.03em;color:var(--turq)}
+  .card p{margin:0;font-size:14.5px;color:var(--ink-dim)}
+
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);font-weight:600}
+  td code{font-size:.82em}
+  tbody tr:hover{background:var(--row-hover)}
+
+  .callout{border:1px solid var(--line);border-left-width:3px;border-radius:10px;padding:14px 18px;margin:18px 0;background:var(--code-bg)}
+  .callout.warn{border-left-color:var(--sand)}
+  .callout.danger{border-left-color:var(--rose)}
+  .callout.note{border-left-color:var(--turq)}
+  .callout .lab{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;display:block;margin-bottom:5px}
+  .callout.warn .lab{color:var(--sand)}
+  .callout.danger .lab{color:var(--rose)}
+  .callout.note .lab{color:var(--turq)}
+  .callout p{margin:4px 0;font-size:15px}
+
+  .kchips{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+  .kchip{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:5px 13px 5px 9px;color:var(--ink-dim)}
+  .kchip .d{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;border:1px solid var(--line);border-radius:5px;padding:2px 7px;color:var(--ink-faint);margin-left:8px;vertical-align:middle}
+  .pill.ok{color:var(--turq);border-color:var(--turq-deep)}
+  .pill.todo{color:var(--sand);border-color:#4a401c}
+
+  .foot{margin-top:60px;padding-top:24px;border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr}
+    .nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line-soft)}
+    .ladder{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+    main{padding:34px 22px 80px}
+    h1{font-size:38px}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="sh-bg"></canvas>
+<canvas id="sh-rays"></canvas>
+<canvas id="sh-particles"></canvas>
+<div class="sh-glass"></div>
+
+<div class="wrap">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="nav">
+    <div class="brand">LinNeo<b>_</b><span class="cur">▌</span></div>
+    <div class="brand-sub">Technical documentation · v3</div>
+    <button class="theme-toggle" id="sh-toggle" onclick="shToggleTheme()">▲ pelagic</button>
+    <nav class="ladder">
+      <a href="#overview"><span class="rank">Biota</span><span class="dot"></span>Overview</a>
+      <a href="#screenshots"><span class="rank">•</span><span class="dot"></span>Screenshots</a>
+      <a href="#arq"><span class="rank">Domain</span><span class="dot"></span>Architecture</a>
+      <a href="#setup"><span class="rank">Kingdom</span><span class="dot"></span>Getting started</a>
+      <a href="#modelo"><span class="rank">Phylum</span><span class="dot"></span>Data model</a>
+      <a href="#pipeline"><span class="rank">Class</span><span class="dot"></span>Data pipeline</a>
+      <a href="#integridad"><span class="rank">Order</span><span class="dot"></span>Integrity & repair</a>
+      <a href="#api"><span class="rank">Family</span><span class="dot"></span>Backend API</a>
+      <a href="#frontend"><span class="rank">Genus</span><span class="dot"></span>Frontend</a>
+      <a href="#archivos"><span class="rank">Species</span><span class="dot"></span>File reference</a>
+      <a href="#capacidades"><span class="rank">±</span><span class="dot"></span>Capabilities & limits</a>
+      <a href="#gotchas"><span class="rank">!</span><span class="dot"></span>Known gotchas</a>
+      <a href="#retos"><span class="rank">»</span><span class="dot"></span>Project challenges</a>
+      <a href="#roadmap"><span class="rank">→</span><span class="dot"></span>Roadmap</a>
+    </nav>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main>
+    <header class="hero">
+      <div class="eyebrow">A living atlas of biodiversity</div>
+      <h1>LinNeo</h1>
+      <p class="lede">A knowledge graph with ~2.5 million species from GBIF, enriched from multiple sources and navigable like the tree of life. Built as the documentary foundation for a book's worldbuilding.</p>
+      <div class="spine">
+        <span class="step"><span class="d" style="background:#cfe6e2"></span><b>Biota</b></span>
+        <span class="step"><b>Domain</b></span>
+        <span class="step"><b>Kingdom</b></span>
+        <span class="step"><b>Phylum</b></span>
+        <span class="step"><b>Class</b></span>
+        <span class="step"><b>Order</b></span>
+        <span class="step"><b>Family</b></span>
+        <span class="step"><b>Genus</b></span>
+        <span class="step"><b>Species</b></span>
+      </div>
+    </header>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <div class="sec-tag">§ Overview</div>
+      <h2>What LinNeo is</h2>
+      <p>LinNeo takes the GBIF taxonomic <em>backbone</em> and models it as a graph in Neo4j: each taxon is a node and the hierarchy is expressed through <code>HAS_CHILD</code> relationships, from a root node <strong>Biota</strong> down to each species. Enriched information from several sources hangs off that skeleton —descriptions, common names, images, sounds, geographic distribution, and conservation status— so every species can be queried as a full record.</p>
+      <p>It's consumed through an API (FastAPI) and a web interface (React) with three visual themes. The ultimate purpose isn't academic but creative: to serve as a reference atlas for building a book's natural world, letting you explore kinship, distribution, and traits of real organisms.</p>
+      <div class="grid">
+        <div class="card"><h4>~2.5M species</h4><p>Full GBIF backbone coverage, all kingdoms.</p></div>
+        <div class="card"><h4>9 kingdoms · 4 domains</h4><p>Hierarchy crowned by Biota → Domain → Kingdom.</p></div>
+        <div class="card"><h4>Multi-source</h4><p>GBIF, Wikipedia, EOL, FishBase, POWO, AmphibiaWeb, Wikidata, Wikimedia, Xeno-canto.</p></div>
+        <div class="card"><h4>3 themes</h4><p>elixir, bookworm, and shui (oceanic, the home page).</p></div>
+      </div>
+    </section>
+
+    <!-- SCREENSHOTS -->
+    <section id="screenshots">
+      <div class="sec-tag">§ Screenshots</div>
+      <h2>Screenshots</h2>
+      <p class="muted">Files live in <code>docs/img/</code>.</p>
+      <div class="grid">
+        <div class="card"><h4>ln_ss1.png</h4><p>shui home: search, radial graph, filters, and per-kingdom example bar.</p></div>
+        <div class="card"><h4>ln_ss2.png</h4><p>Graph focused (<code>graph_focus</code>) on the Viruses kingdom.</p></div>
+        <div class="card"><h4>ln_ss3.png</h4><p>Genus <em>Olea</em> view with distribution map and minigraph.</p></div>
+        <div class="card"><h4>ln_ss4.png / ln_ss5.png</h4><p><em>Lactarius indigo</em> species page, parts 1 and 2.</p></div>
+        <div class="card"><h4>ln_ss6.png / ln_ss7.png</h4><p><em>Olea europaea</em> L. species page, parts 1 and 2.</p></div>
+        <div class="card"><h4>ln_ss8.png</h4><p>Mosaic gallery of the family Nectariniidae.</p></div>
+        <div class="card"><h4>ln_ss9.png</h4><p>Sound tree of the family Nectariniidae.</p></div>
+        <div class="card"><h4>ln_ss10.png</h4><p>Animalia kingdom infographic.</p></div>
+      </div>
+      <div class="callout note"><span class="lab">Why ln_ss10 leaves the per-kingdom count visible</span><p>The infographic deliberately keeps the species-by-kingdom breakdown visible (instead of hiding or normalizing it) because it works as a visual diagnostic for data cross-checks: if thousands of species show up whose declared <code>kingdom</code> doesn't match the kingdom they're structurally reachable from, that's exactly the kingdom-misplacement issue described in <a href="#integridad">Integrity & repair</a> — visible at a glance instead of hidden inside a query.</p></div>
+      <div class="callout warn"><span class="lab">Unresolved performance</span><p>Taking these screenshots made a real limitation obvious: detail-heavy views take a few seconds to load, even when capped at a maximum of 250 species per query. Fetching that much data efficiently still hasn't been solved. Even so, navigability and the interactive exploration of the tree of life —graphs you can focus node by node, maps, galleries, and live sound trees— is one of the project's biggest strengths.</p></div>
+    </section>
+
+    <!-- ARQ -->
+    <section id="arq">
+      <div class="sec-tag">§ Architecture</div>
+      <h2>Architecture</h2>
+      <p>Three layers running in parallel:</p>
+      <table>
+        <thead><tr><th>Layer</th><th>Technology</th><th>Role</th><th>Port</th></tr></thead>
+        <tbody>
+          <tr><td>Database</td><td>Neo4j (database <code>linneo</code>)</td><td>Taxonomic graph + enrichment. Auth disabled locally.</td><td>7687 / 7474</td></tr>
+          <tr><td>Backend</td><td>FastAPI (uvicorn)</td><td>Translates HTTP requests into Cypher and returns JSON.</td><td>8000</td></tr>
+          <tr><td>Frontend</td><td>React + Vite</td><td>UI; <code>/api</code> proxy → <code>localhost:8000</code>.</td><td>5173</td></tr>
+        </tbody>
+      </table>
+      <p>The runtime flow is linear: the browser calls <code>/api/*</code>, Vite forwards it to the backend, FastAPI runs the Cypher query against Neo4j, and returns JSON that the frontend renders (species pages, graphs, maps). Besides runtime, there's an offline <strong>data pipeline</strong> (Python scripts + Cypher loaders) that populates the database once; see <a href="#pipeline">Pipeline</a>.</p>
+    </section>
+
+    <!-- SETUP -->
+    <section id="setup">
+      <div class="sec-tag">§ Getting started</div>
+      <h2>Getting started</h2>
+      <h3>Backend</h3>
+      <pre><code>cd backend
+uvicorn app.main:app --reload   # port 8000
+# Reads credentials from .secrets/.env; default database "linneo", empty password.</code></pre>
+      <h3>Frontend</h3>
+      <pre><code>cd frontend
+npm install        # after any package.json change
+npm run dev        # port 5173, HMR active</code></pre>
+      <p class="muted">Main frontend dependencies: react, react-dom, react-router-dom, leaflet, react-leaflet, d3-force, d3-drag, d3-selection. Standard font across all views: Iosevka.</p>
+      <div class="callout note"><span class="lab">Golden rule</span><p>uvicorn's <code>--reload</code> only reloads the backend; Vite's HMR reloads the frontend on save. Every change to <code>package.json</code> requires <code>npm install</code>. Never use <code>npm audit fix --force</code>.</p></div>
+    </section>
+
+    <!-- MODELO -->
+    <section id="modelo">
+      <div class="sec-tag">§ Data model</div>
+      <h2>Data model in Neo4j</h2>
+      <p>The graph is structured on two planes: the <strong>taxonomic hierarchy</strong> (a single <code>HAS_CHILD</code> chain from Biota down to each species) and the <strong>enrichment</strong> hanging off species (descriptions, media, distribution).</p>
+
+      <h3>Nodes</h3>
+      <table>
+        <thead><tr><th>Label</th><th>Properties</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><code>Biota</code></td><td><code>biota_key</code>, <code>name</code></td><td>Single root node. Layer added on top of Kingdom.</td></tr>
+          <tr><td><code>Domain</code></td><td><code>domain_key</code>, <code>name</code></td><td>Eukaryota, Prokaryota, Viruses, incertae sedis.</td></tr>
+          <tr><td><code>Kingdom</code></td><td><code>kingdom_key</code>, <code>name</code></td><td>9 kingdoms (Fungi rebuilt, key 9).</td></tr>
+          <tr><td><code>Phylum</code> / <code>Class</code> / <code>Order</code></td><td><code>*_key</code>, <code>name</code></td><td>In-house numbering (not GBIF).</td></tr>
+          <tr><td><code>Family</code> / <code>Genus</code></td><td><code>*_key</code>, <code>name</code></td><td>The key <em>is</em> the GBIF taxonID.</td></tr>
+          <tr><td><code>Species</code></td><td><code>species_key</code>, <code>scientific_name</code>, <code>canonical_name</code>, <code>kingdom</code>, <code>kingdom_key</code>, <code>habit</code>, <code>commonNames[]</code>, <code>conservation_overall</code>, <code>conservation_overall_code</code></td><td>The key is the GBIF taxonID.</td></tr>
+          <tr><td><code>Country</code></td><td><code>key</code>, <code>name</code></td><td>ISO; matches distribution by alpha-2.</td></tr>
+          <tr><td><code>Continent</code></td><td><code>name</code></td><td>Derived from countries.</td></tr>
+          <tr><td><code>Description</code></td><td><code>text</code>, <code>type</code>, <code>lang</code>, <code>source_name</code>, <code>source_url</code>, <code>origin</code></td><td>Multilingual, multi-source.</td></tr>
+          <tr><td><code>Media</code></td><td><code>media_type</code>, <code>url</code>, <code>title</code>, <code>creator</code>, <code>license</code>, <code>source_name</code>, <code>origin</code></td><td>Images and sounds.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Relationships</h3>
+      <table>
+        <thead><tr><th>Type</th><th>From → To</th><th>Properties</th></tr></thead>
+        <tbody>
+          <tr><td><code>HAS_CHILD</code></td><td>Biota → … → Species</td><td>—</td></tr>
+          <tr><td><code>FOUND_IN</code></td><td>Species → Country</td><td><code>establishment_means</code>, <code>occurrence_status</code>, <code>conservation_status</code>, <code>conservation_code</code></td></tr>
+          <tr><td><code>PART_OF</code></td><td>Country → Continent</td><td>—</td></tr>
+          <tr><td><code>HAS_DESCRIPTION</code></td><td>Species → Description</td><td>—</td></tr>
+          <tr><td><code>HAS_MEDIA</code></td><td>Species → Media</td><td>—</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Upper hierarchy</h3>
+      <p>The top is set by <code>setup_biota_domains.cypher</code> (in the repo, <code>domain_key.cql</code>), idempotent and self-correcting:</p>
+      <table>
+        <thead><tr><th>Domain</th><th>key</th><th>Kingdoms</th></tr></thead>
+        <tbody>
+          <tr><td>Eukaryota</td><td>1</td><td>Animalia, Plantae, Fungi, Chromista, Protozoa</td></tr>
+          <tr><td>Prokaryota</td><td>2</td><td>Bacteria, Archaea</td></tr>
+          <tr><td>Viruses</td><td>3</td><td>Viruses</td></tr>
+          <tr><td>incertae sedis</td><td>4</td><td>incertae sedis</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">Prokaryota isn't a formal domain in the three-domain system (Bacteria and Archaea are usually separate), but it was deliberately chosen this way for the project's hierarchy.</p>
+
+      <div class="callout danger"><span class="lab">Critical gotcha · key scheme</span>
+        <p>Keys are <strong>not uniform</strong> across ranks. <code>family</code>, <code>genus</code>, and <code>species</code> use the <strong>GBIF taxonID</strong> as their key (e.g. Amanitaceae=23780, Amanita=257861). <code>kingdom</code>, <code>phylum</code>, <code>class</code>, <code>order</code>, and <code>domain</code>, on the other hand, use <strong>small in-house numbering</strong> (e.g. Basidiomycota=16, Agaricales=50). Any cross-reference with GBIF data must respect this: by key at the low ranks, by name at the high ones.</p>
+      </div>
+
+      <h3>Color by kingdom</h3>
+      <p>The frontend tints the entire UI according to the active kingdom (<code>kingdomColor.js</code>, <code>KINGDOM_HUE</code> map):</p>
+      <div class="kchips">
+        <span class="kchip"><span class="d" style="background:hsl(48,90%,55%)"></span>Animalia 48°</span>
+        <span class="kchip"><span class="d" style="background:hsl(135,70%,50%)"></span>Plantae 135°</span>
+        <span class="kchip"><span class="d" style="background:hsl(280,80%,62%)"></span>Fungi 280°</span>
+        <span class="kchip"><span class="d" style="background:hsl(172,90%,50%)"></span>Chromista 172°</span>
+        <span class="kchip"><span class="d" style="background:hsl(212,85%,58%)"></span>Bacteria 212°</span>
+        <span class="kchip"><span class="d" style="background:hsl(28,85%,55%)"></span>Archaea 28°</span>
+        <span class="kchip"><span class="d" style="background:hsl(328,80%,62%)"></span>Protozoa 328°</span>
+        <span class="kchip"><span class="d" style="background:hsl(2,85%,60%)"></span>Viruses 2°</span>
+        <span class="kchip"><span class="d" style="background:hsl(0,0%,55%)"></span>incertae sedis</span>
+      </div>
+    </section>
+
+    <!-- PIPELINE -->
+    <section id="pipeline">
+      <div class="sec-tag">§ Data pipeline</div>
+      <h2>Data pipeline</h2>
+      <p>Populating the database is a four-stage offline process. Outputs live in <code>biodiversity_data/</code>.</p>
+
+      <h3>1 · Download and sources</h3>
+      <p><code>download_all.py</code> orchestrates the <em>fetchers</em>, and <code>data_fetchers/download_biodiversity_data.py</code> downloads the GBIF backbone (<code>backbone.zip</code>), from which taxonomy, distribution (242 countries), and conservation are extracted. Each fetcher adds an enrichment layer:</p>
+      <table>
+        <thead><tr><th>Fetcher</th><th>Contributes</th><th>Output</th></tr></thead>
+        <tbody>
+          <tr><td><code>wikipedia_fetcher</code></td><td>Descriptions</td><td><code>descriptions/wikipedia_descriptions.csv</code></td></tr>
+          <tr><td><code>eol_fetcher</code></td><td>Descriptions (Encyclopedia of Life)</td><td><code>descriptions/eol_descriptions.csv</code></td></tr>
+          <tr><td><code>fishbase_fetcher</code></td><td>Fish data</td><td><code>fishbase/fishbase_fish.csv</code>, <code>species.parquet</code></td></tr>
+          <tr><td><code>powo_fetcher</code></td><td>Plants (Plants of the World Online)</td><td><code>powo/powo_plants.csv</code></td></tr>
+          <tr><td><code>amphibiaweb_fetcher</code></td><td>Amphibians</td><td><code>amphibiaweb/amphibiaweb_data.csv</code></td></tr>
+          <tr><td><code>wikidata_fetcher</code></td><td>Common names</td><td><code>wikidata/wikidata_common_names.csv</code></td></tr>
+          <tr><td><code>wikimedia_images_fetcher</code></td><td>Images</td><td><code>images/wikimedia_images.csv</code></td></tr>
+          <tr><td><code>xeno_canto_fetcher</code></td><td>Bird sounds</td><td><code>xeno_canto/xeno_canto_sounds.csv</code></td></tr>
+        </tbody>
+      </table>
+      <p class="muted">Each fetcher keeps its own <code>*_progress</code> and <code>*_fetcher.log</code> to resume and audit. <code>fetcher_template.py</code> is the base template.</p>
+
+      <h3>2 · Backbone extras</h3>
+      <p><code>backbone_extras.py</code> processes the backbone <em>extract</em> (not included in this documentation) and generates <code>backbone_csv/</code>: descriptions (all languages, cleaned HTML), <code>vernacular_es</code> (common names), images, references, and type specimens. Approximate coverage: 1.08M references, 551K descriptions, 224K vernaculars, 192K multimedia, 35K types.</p>
+
+      <h3>3 · Cleanup</h3>
+      <p><code>clean4neo4j.py</code> normalizes the CSVs so <code>LOAD CSV</code> can ingest them without errors. <code>peek_csv.py</code> is used to inspect them.</p>
+
+      <h3>4 · Load</h3>
+      <p>The loaders in <code>db_loaders/</code> import each layer into Neo4j (one per source):</p>
+      <pre><code>cypher_import_taxonomy.cypher       # nodes per rank + hierarchy
+cypher_import_relationships.cypher  # FOUND_IN, PART_OF (geography)
+cypher_import_backbone.cypher       # descriptions/media/refs from the backbone
+cypher_import_wikipedia.cql         cypher_import_powo.cql
+cypher_import_wikidata.cql          cypher_import_fishbase.cql
+cypher_import_amphibiaweb.cql       cypher_import_images.cql
+cypher_import_sounds.cql</code></pre>
+      <p class="muted">Final nodes per rank live in <code>taxonomy_nodes_by_rank/</code>, and relationships per level in <code>relationships/</code>.</p>
+    </section>
+
+    <!-- INTEGRIDAD -->
+    <section id="integridad">
+      <div class="sec-tag">§ Integrity & repair</div>
+      <h2>Integrity maintenance <span class="pill ok">89% resolved</span></h2>
+      <div class="callout note"><span class="lab">Methodology, in short</span><p>For every variant of the problem (orphans, multi-parent, misplaced) the same pattern was followed: <strong>1)</strong> diagnose with Cypher how many nodes and of what type, never repair blindly; <strong>2)</strong> cross-reference the backbone (<code>Taxon.tsv</code>) by <code>taxonID</code>, and if the key isn't there, <strong>fall back to name+rank</strong> with a uniqueness safeguard to avoid grabbing homonyms from another kingdom; <strong>3)</strong> walk up the <code>parentNameUsageID</code> chain, skipping unmodeled ranks, until the first real ancestor; <strong>4)</strong> generate CSV + idempotent Cypher instead of editing the graph by hand, so it can be re-run, audited, and reverted. Genuinely ambiguous cases are deliberately left untouched.</p></div>
+      <p>The original load left the graph with two big wounds that were diagnosed and repaired in depth.</p>
+
+      <h3>Problem 1 · Missing Fungi kingdom</h3>
+      <p>171,665 species had <code>kingdom='Fungi'</code>, but no <code>Kingdom</code> node for Fungi existed, nor its upper links: 7,945 families and 11 phyla ended up orphaned. Cause: in GBIF, many Fungi taxa hang directly off the Kingdom (taxonID 5), and since that node was never created during the load, they were left loose.</p>
+
+      <h3>Problem 2 · 26,747 orphan nodes</h3>
+      <p>An audit revealed the problem wasn't exclusive to Fungi: there were nodes with no <code>HAS_CHILD</code> parent across all ranks (19,608 genera, 6,795 families, 171 species, 158 orders, 15 classes). Every loose intermediate node disconnects its entire branch from the tree.</p>
+
+      <h3>Diagnosis</h3>
+      <ul>
+        <li><strong>Mixed key scheme</strong> (see Data model): prevented cross-referencing uniformly by ID.</li>
+        <li><strong>Unmodeled intermediate GBIF ranks</strong> (subfamily, tribe, subgenus): many genera hang off a subfamily, not a family directly.</li>
+        <li><strong>Nodes from other sources</strong>: ~18,800 genera/families with in-house numbering keys (1…266,446) that don't exist as a taxonID in the backbone — fossils, real taxa, and environmental sequences (UNITE Species Hypotheses, <code>unranked</code> rank).</li>
+      </ul>
+
+      <h3>Solution</h3>
+      <p>The <code>repair_orphans.py</code> script rebuilds the links following this strategy:</p>
+      <ul>
+        <li>Reads the graph's orphan export + the backbone's <code>Taxon.tsv</code>.</li>
+        <li>Identifies the orphan by its graph key (exact match within the graph).</li>
+        <li><strong>Walks up the <code>parentNameUsageID</code> chain</strong>, skipping unmodeled ranks, until the first main ancestor.</li>
+        <li><strong>Name fallback</strong>: if the key isn't in the backbone, searches by name+rank (with a uniqueness safeguard to avoid grabbing homonyms from other kingdoms).</li>
+        <li>Generates <code>orphan_links.csv</code> plus a custom-built <code>repair_orphans.cypher</code> (one block per child→parent combination, choosing a match by key or by name).</li>
+      </ul>
+      <p><strong>Result:</strong> 23,867 of 26,747 reconnected (89%). ~1,346 remain, mostly ambiguous homonyms (where the safeguard deliberately abstained) and UNITE environmental sequences — noise irrelevant to the project.</p>
+
+      <h3>Problem 3 · Nodes with multiple parents across kingdoms</h3>
+      <p>Reconnecting orphans revealed another wound: nodes with more than one incoming <code>HAS_CHILD</code> relationship, some crossing different kingdoms — duplication from divergent backbone paths. <code>dedupe_by_kingdom.cql</code> applied the same methodology (above), filtering by the real kingdom deduced from descendant species: <strong>genus</strong> went from 3,525 down to 1,205 multi-parent nodes, <strong>family</strong> from several down to 7. What's left is multi-parent <em>within the same kingdom</em> (genuine sibling nodes, e.g. taxonomic synonyms) — harmless since they don't cause cross-kingdom leaks, so they're left as optional low-priority polish.</p>
+
+      <h3>Support tools</h3>
+      <div class="grid">
+        <div class="card"><h4>explore_taxon.py</h4><p>Streaming explorer for the Taxon.tsv (2.2 GB). Modes: <code>header</code>, <code>sample</code>, <code>find</code>, <code>byid</code>, <code>byname</code>, <code>fungi</code>, <code>keycols</code>.</p></div>
+        <div class="card"><h4>audit_graph.cql</h4><p>Integrity audit: orphans per rank, total kingdoms, species reachable from Biota.</p></div>
+        <div class="card"><h4>repair_orphans.py</h4><p>General-purpose repairer. Generates a link CSV + idempotent Cypher.</p></div>
+      </div>
+      <div class="callout warn"><span class="lab">Usage note</span><p><code>Taxon.tsv</code> has huge fields; every script that reads it raises the <code>csv</code> module's limit with <code>csv.field_size_limit(...)</code>. Name/key cross-references require Neo4j indexes (created by <code>repair_orphans.cypher</code> itself).</p></div>
+    </section>
+
+    <!-- API -->
+    <section id="api">
+      <div class="sec-tag">§ Backend API</div>
+      <h2>Backend API</h2>
+      <p>FastAPI exposes the graph as JSON. The client (<code>frontend/src/api/client.js</code>) wraps these endpoints:</p>
+      <table>
+        <thead><tr><th>Client method</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>stats()</code></td><td>Global graph counts.</td></tr>
+          <tr><td><code>search(q)</code></td><td>Search by name (fulltext indexes).</td></tr>
+          <tr><td><code>searchDescription(q)</code></td><td>Search within description text.</td></tr>
+          <tr><td><code>species(key)</code></td><td>Full record for a species.</td></tr>
+          <tr><td><code>taxon(rank, key)</code></td><td>Upper taxonomic node + its children.</td></tr>
+          <tr><td><code>filter({country, …})</code></td><td>Species by filters (e.g. country).</td></tr>
+          <tr><td><code>kingdoms()</code></td><td>List of kingdoms.</td></tr>
+          <tr><td><code>graph()</code></td><td>Base graph (root → kingdoms → phyla).</td></tr>
+          <tr><td><code>graphFocus(rank, key)</code></td><td>Recenter the graph on a node (depth 1).</td></tr>
+          <tr><td><code>randomKingdoms()</code></td><td>One species with a description per kingdom (examples).</td></tr>
+          <tr><td><code>randomDescendants(rank, key)</code></td><td>Random descendants of a node.</td></tr>
+          <tr><td><code>continents()</code> / <code>countries(continent)</code></td><td>Chained geographic filters.</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">Implementation: <code>backend/app/main.py</code> (routes), <code>queries.py</code> (Cypher), <code>db.py</code> (driver). Recommended index to speed up examples: <code>CREATE INDEX species_kingdom FOR (s:Species) ON (s.kingdom)</code>.</p>
+    </section>
+
+    <!-- FRONTEND -->
+    <section id="frontend">
+      <div class="sec-tag">§ Frontend</div>
+      <h2>Frontend</h2>
+
+      <h3>Themes</h3>
+      <div class="grid">
+        <div class="card"><h4>shui</h4><p>Turquoise oceanic. It's the home page (<code>/</code>): search with autocomplete (keyboard navigation, match highlighting, rank/kingdom shown per suggestion, loading/error/no-results states), radial graph, chained continent/country filters, a per-kingdom example bar with a flame-style glow, canvas background with bubbles and bioluminescent particles.</p></div>
+        <div class="card"><h4>bookworm</h4><p>Reading theme. Taxonomic node view (<code>/taxon/:rank/:key</code>) in two columns with a graph + children list, plus three new views: a mosaic gallery (tetris-style bin-packing, dynamic columns based on viewport), a bird sound tree (horizontal, floating multi-track player with independent volume/pause/download per tab), and a taxon infographic (single-screen poster: stats, mini world map, breakdown by conservation and by kingdom, featured species from different phyla).</p></div>
+        <div class="card"><h4>elixir</h4><p>Base theme (tokens in <code>tokens.css</code>); particle background that takes on the active kingdom's hue.</p></div>
+      </div>
+      <p class="muted">The graph (<code>graph_focus</code>) is capped at 60 children on the first level and 15 per sibling on the second, prioritized by descendant count, so that kingdoms with thousands of reconnected children (Fungi especially) don't saturate the radial layout.</p>
+
+      <h3>Pages and components</h3>
+      <table>
+        <thead><tr><th>File</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>pages/Shui.jsx</code></td><td>Home: search + graph + filters + examples.</td></tr>
+          <tr><td><code>pages/SpeciesDetail.jsx</code></td><td>Species page in a 30/40/30 triptych (technical · descriptions+map · media).</td></tr>
+          <tr><td><code>pages/TaxonNode.jsx</code></td><td>Upper taxonomic node (bookworm theme).</td></tr>
+          <tr><td><code>components/ShuiGraph.jsx</code></td><td>Main radial graph (d3, layout proportional to number of children).</td></tr>
+          <tr><td><code>components/TaxonomyGraph.jsx</code></td><td>Lineage+kinship graph for the species page; colored by rank; guarded against incomplete taxonomies.</td></tr>
+          <tr><td><code>components/TaxonGraph.jsx</code></td><td>Navigation graph for TaxonNode.</td></tr>
+          <tr><td><code>components/DistributionMap.jsx</code></td><td>Leaflet map; colored by <code>establishment_means</code>.</td></tr>
+          <tr><td><code>backgrounds/ShuiBackground.jsx</code></td><td>Oceanic canvas (gradient + bubbles + bioluminescence).</td></tr>
+          <tr><td><code>backgrounds/ElixirGraph.jsx</code>, <code>KingdomBackdrop.jsx</code></td><td>Particle backgrounds and radial veil per kingdom.</td></tr>
+          <tr><td><code>theme/kingdomColor.js</code></td><td>Hue map and color utilities per kingdom.</td></tr>
+          <tr><td><code>theme/KingdomContext.jsx</code></td><td>Active kingdom context (tints the UI).</td></tr>
+          <tr><td><code>theme/*.css</code></td><td>tokens, shui, bookworm.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ARCHIVOS -->
+    <section id="archivos">
+      <div class="sec-tag">§ File reference</div>
+      <h2>File reference</h2>
+
+      <h3>Root</h3>
+      <table>
+        <thead><tr><th>File</th><th>Function</th></tr></thead>
+        <tbody>
+          <tr><td><code>download_all.py</code></td><td>Orchestrator for the download/fetcher pipeline.</td></tr>
+          <tr><td><code>backbone_extras.py</code></td><td>Generates CSVs of descriptions/vernaculars/images/refs/types from the backbone.</td></tr>
+          <tr><td><code>clean4neo4j.py</code></td><td>Cleans/normalizes CSVs for <code>LOAD CSV</code>.</td></tr>
+          <tr><td><code>peek_csv.py</code></td><td>Quick CSV inspection.</td></tr>
+          <tr><td><code>explore_taxon.py</code></td><td>Streaming explorer for Taxon.tsv.</td></tr>
+          <tr><td><code>repair_orphans.py</code></td><td>General-purpose orphan repairer.</td></tr>
+          <tr><td><code>domain_key.cql</code></td><td>Upper hierarchy Biota → Domain → Kingdom (idempotent).</td></tr>
+          <tr><td><code>audit_graph.cql</code></td><td>Integrity audit.</td></tr>
+          <tr><td><code>overview.cql</code>, <code>example_queries.cypher</code></td><td>Reference queries.</td></tr>
+          <tr><td><code>*.ipynb</code></td><td>Exploration/transformation notebooks (explorar_backbone, explore, relationships, transform).</td></tr>
+          <tr><td><code>kanban.md</code>, <code>steps.md</code>, <code>README.md</code></td><td>Planning and process documentation.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Folders</h3>
+      <table>
+        <thead><tr><th>Folder</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td><code>backend/app/</code></td><td><code>main.py</code>, <code>queries.py</code>, <code>db.py</code>.</td></tr>
+          <tr><td><code>data_fetchers/</code></td><td>One fetcher per source + template + GBIF downloader.</td></tr>
+          <tr><td><code>db_loaders/</code></td><td>Cypher loaders, one per source.</td></tr>
+          <tr><td><code>frontend/src/</code></td><td>App, pages, components, backgrounds, themes, API client.</td></tr>
+          <tr><td><code>biodiversity_data/</code></td><td>Pipeline outputs: nodes per rank, relationships, backbone_csv, orphan_csv, and one folder per fetcher.</td></tr>
+          <tr><td><code>docs/img/</code></td><td><code>schema.png</code> and the numbered <code>ln_ss*.png</code> screenshots.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- CAPACIDADES -->
+    <section id="capacidades">
+      <div class="sec-tag">§ Capabilities & limits</div>
+      <h2>Capabilities and limitations</h2>
+      <h3>What it can do</h3>
+      <ul>
+        <li>Navigate the tree of life from Biota to ~2.5M species with interactive graphs, focusable node by node.</li>
+        <li>Show species pages: taxonomy, distribution (242 countries), conservation (IUCN), multi-source and multilingual descriptions, images, sounds, and common names.</li>
+        <li>Search by name and within descriptions; filter by geography (continent → country).</li>
+        <li>Tint the entire UI by kingdom and switch between three themes.</li>
+      </ul>
+      <p class="muted">Navigability and interactive exploration are, right now, the project's biggest strength: maps, galleries, and live sound trees, not just data tables.</p>
+      <h3>What it can't do (yet)</h3>
+      <ul>
+        <li><strong>Unresolved loading performance</strong>: detail-heavy views take a few seconds even when capped at 250 species per query.</li>
+        <li>~1,346 orphan nodes (marginal taxa and environmental sequences) remain outside the tree.</li>
+        <li>~33,300 species with kingdom misplacement (diagnosed, fix designed, execution pending).</li>
+        <li>Enrichment is partial: not every species has an image, sound, or description.</li>
+        <li>The data is a snapshot; updating it requires re-running the pipeline.</li>
+      </ul>
+    </section>
+
+    <!-- GOTCHAS -->
+    <section id="gotchas">
+      <div class="sec-tag">§ Known gotchas</div>
+      <h2>Known gotchas</h2>
+      <div class="callout warn"><span class="lab">Key scheme</span><p>family/genus/species = GBIF taxonID; kingdom/phylum/class/order/domain = in-house numbering. Don't assume uniformity when cross-referencing data.</p></div>
+      <div class="callout warn"><span class="lab">Neo4j Browser export</span><p>Truncates to ~5,000 rows by default. For large dumps use <code>cypher-shell --format plain &gt; file.csv</code> or raise "Maximum number of records".</p></div>
+      <div class="callout warn"><span class="lab">UNITE / unranked</span><p>The Fungi backbone includes hundreds of thousands of <em>Species Hypotheses</em> (codes like <code>SH1129775.09FU</code>, <code>unranked</code> rank) hanging off the Kingdom. They're noise and don't connect as named taxa.</p></div>
+      <div class="callout warn"><span class="lab">Homonyms across kingdoms</span><p>The same genus name can exist in several kingdoms. Name-based cross-references carry a uniqueness safeguard; ambiguous ones are deliberately left untouched.</p></div>
+    </section>
+
+    <!-- RETOS -->
+    <section id="retos">
+      <div class="sec-tag">§ Project challenges</div>
+      <h2>Project challenges</h2>
+      <p>The biggest problems faced throughout development, how they were diagnosed, and where they stand. The general methodology is under <a href="#integridad">Integrity & repair</a>; here's the record of each specific challenge.</p>
+
+      <h3>Entire Fungi kingdom disconnected <span class="pill ok">resolved</span></h3>
+      <p>171,665 species had <code>kingdom='Fungi'</code>, but no <code>Kingdom</code> node for Fungi existed: 7,945 families and 11 phyla ended up orphaned. The real challenge was identifying which nodes belonged to Fungi without having the <code>kingdom</code> property on hand at the intermediate ranks. Solution: start from the Fungi species (which do carry the property), walk up the existing <code>HAS_CHILD</code> relationships as far as they'd go, identify where the chain broke, and rebuild from there using <code>Taxon.tsv</code> to create the <code>Kingdom</code> and the missing links.</p>
+
+      <h3>~26,747 orphan nodes across all ranks <span class="pill ok">89% resolved</span></h3>
+      <p>Generalizing from the Fungi problem, the same pattern of parentless nodes turned up in genera, families, species, orders, and classes across all kingdoms. <code>repair_orphans.py</code> resolved 23,867 of 26,747 (89%) by cross-referencing <code>taxonID</code> or, failing that, name+rank with a uniqueness safeguard.</p>
+
+      <h3>Nodes with multiple parents across kingdoms <span class="pill ok">~99% resolved</span></h3>
+      <p><code>dedupe_by_kingdom.cql</code> brought genera with multiple parents down from 3,525 to 1,205 and families to 7. A second pass, <code>dedupe_parents.py</code> (v3→v4, five resolution steps: direct key match, name+kingdom+lineage, fusion of duplicates with a common ancestor, real kingdom of descendant species as a tiebreaker, and a single verifiable parent by elimination), resolved 3,510 of 3,532 cases (99.2%), leaving 10 genuinely ambiguous and 2 node fusions. Side effect detected: 38 genera ended up orphaned because their "kept" parent was never a real edge in the graph — they were reclassified as standard orphans and repaired with <code>repair_orphans.py</code> v2 (which also added the kingdom filter to its name fallback, resolving 339 additional previously-ambiguous cases).</p>
+
+      <h3>Kingdom misplacement <span class="pill todo">diagnosed, execution pending</span></h3>
+      <p>~33,300 species are reachable from a different kingdom than the one declared in their <code>kingdom</code> property (e.g. plants hanging under Animalia). Confirmed diagnosis: this isn't duplication but a single wrong parent per node (1,927 cases with one parent, 21 with two, 1 with three, just for plant genera trapped under Animalia). The designed solution reuses the <code>repair_orphans</code>/<code>dedupe_parents</code> machinery: resolve the true parent in the backbone filtered by the real kingdom (deduced from descendant species), then MERGE the correct edge + DELETE the wrong one. It's visible in the frontend's per-kingdom infographics (see <a href="#screenshots">Screenshots</a>).</p>
+
+      <h3>MemoryPoolOutOfMemoryError on the infographic <span class="pill ok">resolved</span></h3>
+      <p>Requesting the infographic for a full kingdom (<code>/taxon/kingdom/{key}/infographic</code>) could materialize potentially millions of species across all its phyla in a single transaction before the limit could be applied, exceeding the configured heap. Fixed by moving the filter and the <code>LIMIT</code> into a <code>CALL (ph) { ... }</code> subquery per phylum, so Neo4j processes each one as its own bounded unit instead of accumulating the whole kingdom's universe.</p>
+
+      <h3>Graph coloring didn't inherit by kingdom at depth <span class="pill ok">resolved</span></h3>
+      <p>Descendants of a kingdom were supposed to inherit its color at any depth, but it got lost at intermediate nodes. Fixed with a backend fallback that walks up <code>HAS_CHILD*</code> until it finds the real <code>Kingdom</code> ancestor.</p>
+
+      <h3>Graph focus saturated for large kingdoms <span class="pill ok">resolved</span></h3>
+      <p>A direct consequence of reconnecting orphans: <code>graph_focus</code> could return thousands of children (Fungi especially) and saturate the radial layout. Capped at 60 children on the first level and 15 per sibling on the second, prioritized by descendant count.</p>
+
+      <h3>Race condition in the search/graph <span class="pill ok">resolved</span></h3>
+      <p>In <code>Shui.jsx</code>, a late-resolving <code>graphFocus</code> promise could overwrite a later graph reset. Fixed with a counter (<code>focusOpRef</code>) that discards results from stale operations.</p>
+
+      <h3>Loading performance with detail-heavy views <span class="pill todo">unresolved</span></h3>
+      <p>Information-dense views take a few seconds to load even when capped at a maximum of 250 species per query. Fetching that much data efficiently still hasn't been optimized — it's the project's most visible limitation today, though navigability and interactivity remain among its biggest strengths.</p>
+    </section>
+
+    <!-- ROADMAP -->
+    <section id="roadmap">
+      <div class="sec-tag">§ Roadmap</div>
+      <h2>Roadmap</h2>
+      <ol>
+        <li><strong>Execute the kingdom-misplacement fix</strong> <span class="pill todo">pending</span> — ~33,300 species; solution already designed (see <a href="#retos">Project challenges</a>).</li>
+        <li><strong>Loading performance with detail-heavy views</strong> <span class="pill todo">pending</span> — still no efficient way to fetch that much data at once.</li>
+        <li><strong>Domain rank in the frontend</strong> <span class="pill todo">pending</span> — add Domain to colors/labels and decide whether ShuiGraph should start at Biota → Domain → Kingdom.</li>
+        <li><strong>shui polish</strong> <span class="pill todo">pending</span> — have the example bar respect active kingdoms; smooth transitions between themes.</li>
+        <li><strong>More bookworm views</strong> <span class="pill todo">pending</span> — new clade "toys".</li>
+        <li><strong>Deployment</strong> <span class="pill todo">pending</span> — GitHub Pages for the frontend; backend + Neo4j hosted.</li>
+        <li><strong>Genomic layer</strong> <span class="pill todo">future</span> — add DNA, chromosome, and sequence information as an extra enrichment layer on top of existing species.</li>
+        <li><strong>GBIF Ebbe Nielsen Challenge</strong> <span class="pill todo">future</span> — consider submitting LinNeo once it's deployed and the genomic layer is added.</li>
+      </ol>
+      <p class="muted">Completed in the frontend session: search autocomplete (keyboard navigation, highlighting, rank/kingdom context, states), the graph cap in <code>queries.py</code>, and the three new bookworm views (gallery, sound tree, infographic).</p>
+      <p class="muted">Closing the ~1,346 remaining orphans (disambiguating homonyms by the kingdom of descendant species) is optional and low-value for the project's goal.</p>
+    </section>
+
+    <div class="foot">
+      LinNeo · documentation generated from the state of the repository and the data/frontend repair work. · github.com/RemiH06/LinNeo
+    </div>
+  </main>
+</div>
+
+<script>
+  // highlight the active sidebar link
+  (function(){
+    var links = Array.prototype.slice.call(document.querySelectorAll('.ladder a'));
+    var map = {};
+    links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          links.forEach(function(l){ l.classList.remove('active'); });
+          if(map[e.target.id]) map[e.target.id].classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('section[id]').forEach(function(s){ obs.observe(s); });
+  })();
+
+  // ── subtle shui background animation, with pelagic/abyssal toggle ──
+  (function(){
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var isDark = false;
+
+    window.shToggleTheme = function(){
+      isDark = !isDark;
+      document.body.classList.toggle('dark', isDark);
+      document.getElementById('sh-toggle').textContent = isDark ? '▼ abyssal' : '▲ pelagic';
+      drawBg();
+    };
+
+    var bgCanvas = document.getElementById('sh-bg');
+    var rayCanvas = document.getElementById('sh-rays');
+    var partCanvas = document.getElementById('sh-particles');
+    var bgCtx = bgCanvas.getContext('2d');
+    var rCtx = rayCanvas.getContext('2d');
+    var pCtx = partCanvas.getContext('2d');
+
+    function drawBg(){
+      var W = bgCanvas.width = window.innerWidth, H = bgCanvas.height = window.innerHeight;
+      var grad = bgCtx.createLinearGradient(0, 0, 0, H);
+      if (isDark){
+        grad.addColorStop(0, '#02060a'); grad.addColorStop(0.45, '#020508'); grad.addColorStop(1, '#010204');
+      } else {
+        grad.addColorStop(0, '#123a4e'); grad.addColorStop(0.35, '#0d2f40'); grad.addColorStop(0.7, '#0a2434'); grad.addColorStop(1, '#081c28');
+      }
+      bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, W, H);
+    }
+
+    // very subtle particles: bubbles (pelagic) or bioluminescence (abyssal)
+    var BIOLUM = ['#c060ff', '#ff6fb0', '#3fe8d8', '#7fe07f'];
+    var particles = [];
+    function spawn(W, H){
+      return isDark
+        ? { x: Math.random()*W, y: H+10, vy:-(0.1+Math.random()*0.22), vx:(Math.random()-0.5)*0.15,
+            r: 1.2+Math.random()*2.6, col: BIOLUM[Math.floor(Math.random()*BIOLUM.length)],
+            alpha: 0.32+Math.random()*0.3, flicker: Math.random()*Math.PI*2, fs: 0.015+Math.random()*0.02 }
+        : { x: Math.random()*W, y: H+10, vy:-(0.2+Math.random()*0.4), vx:(Math.random()-0.5)*0.18,
+            r: 1.4+Math.random()*3.4, wobble: Math.random()*Math.PI*2, ws: 0.015+Math.random()*0.02, alpha: 0.22+Math.random()*0.24 };
+    }
+    function drawParticles(){
+      var W = rayCanvas.width = window.innerWidth, H = rayCanvas.height = window.innerHeight;
+      rCtx.clearRect(0, 0, W, H);
+      if (Math.random() < (isDark ? 0.05 : 0.045)) particles.push(spawn(W, H));
+      particles = particles.filter(function(p){
+        p.x += p.vx; p.y += p.vy;
+        if (isDark){
+          p.flicker += p.fs;
+          var fa = p.alpha * (0.6 + Math.sin(p.flicker)*0.3);
+          var halo = rCtx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r*4);
+          halo.addColorStop(0, p.col+'AA'); halo.addColorStop(1, p.col+'00');
+          rCtx.globalAlpha = fa*0.5; rCtx.beginPath(); rCtx.arc(p.x, p.y, p.r*4, 0, Math.PI*2); rCtx.fillStyle = halo; rCtx.fill();
+          rCtx.globalAlpha = fa; rCtx.beginPath(); rCtx.arc(p.x, p.y, p.r, 0, Math.PI*2); rCtx.fillStyle = p.col; rCtx.fill();
+        } else {
+          p.wobble += p.ws; p.x += Math.sin(p.wobble)*0.25;
+          rCtx.globalAlpha = p.alpha; rCtx.beginPath(); rCtx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+          rCtx.strokeStyle = 'rgba(210,248,255,0.7)'; rCtx.lineWidth = 0.8; rCtx.stroke();
+        }
+        rCtx.globalAlpha = 1;
+        return p.y > -20;
+      });
+    }
+
+    function drawWaves(ts){
+      var W = partCanvas.width = window.innerWidth, H = partCanvas.height = window.innerHeight;
+      pCtx.clearRect(0, 0, W, H);
+      var t = ts * 0.00025;
+      var n = isDark ? 8 : 12;
+      for (var i = 0; i < n; i++){
+        var yBase = (i/n) * H, amp = 1 + Math.sin(i*1.1)*0.8, phase = t + i*0.6;
+        var alpha = isDark ? 0.03 : (0.03 + (i/n)*0.02);
+        pCtx.beginPath();
+        for (var x = 0; x <= W; x += 8){
+          var y = yBase + Math.sin(x*0.012+phase)*amp;
+          x === 0 ? pCtx.moveTo(x, y) : pCtx.lineTo(x, y);
+        }
+        pCtx.strokeStyle = isDark ? 'rgba(80,120,200,'+alpha+')' : 'rgba(180,240,255,'+alpha+')';
+        pCtx.lineWidth = 0.6; pCtx.stroke();
+      }
+    }
+
+    drawBg();
+    window.addEventListener('resize', drawBg);
+    if (!reduced){
+      (function loop(ts){ drawParticles(); drawWaves(ts||0); requestAnimationFrame(loop); })();
+    }
+  })();
+</script>
+</body>
+</html>
