@@ -54,8 +54,8 @@ query.
 | Layer | Technology | Role | Port |
 |---|---|---|---|
 | Database | Neo4j (database `linneo`) | Taxonomic graph + enrichment | 7687 / 7474 |
-| Backend | FastAPI (uvicorn) | Translates HTTP requests into Cypher | 8000 |
-| Frontend | React + Vite | UI, three themes, `/api` proxy → `localhost:8000` | 5173 |
+| Backend | FastAPI (uvicorn) | Translates HTTP requests into Cypher | 8035 |
+| Frontend | React + Vite | UI, three themes, `/api` proxy → `localhost:8035` | 5135 |
 
 Besides the running app there is an offline **data pipeline** (Python scripts + Cypher
 loaders) that populates the database once from the GBIF backbone.
@@ -75,24 +75,18 @@ loaders) that populates the database once from the GBIF backbone.
    server.memory.heap.max_size=8G
    server.memory.pagecache.size=4G
    ```
-4. Create a `.secrets` file at the project root (it's in `.gitignore`):
-   ```
-   URI=bolt://localhost:7687
-   USER=neo4j
-   PASSWORD=your_password
-   DATABASE=linneo
-   ```
+4. Copy `.env.example` to `.env` at the project root (it's in `.gitignore`) and fill in the values.
 5. Run the data pipeline (see details below) until Neo4j is loaded.
 6. Start the backend:
    ```
    cd backend
-   uvicorn app.main:app --reload   # port 8000
+   uvicorn app.main:app --reload --port 8035
    ```
 7. Start the frontend:
    ```
    cd frontend
    npm install
-   npm run dev                     # port 5173
+   npm run dev                     # port 5135
    ```
 
 ## Data pipeline

@@ -4,9 +4,9 @@ LinNeo API -- FastAPI sobre el grafo Neo4j.
 Ejecutar:
     cd backend
     pip install -r requirements.txt
-    uvicorn app.main:app --reload
+    uvicorn app.main:app --reload --port 8035
 
-Docs interactivas: http://localhost:8000/docs
+Docs interactivas: http://localhost:8035/docs
 """
 
 from fastapi import FastAPI, HTTPException, Query

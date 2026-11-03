@@ -11,7 +11,7 @@ especies que XC tiene, con un solo sonido cada una.
 NOTA: La API v3 requiere API KEY gratuita (desde oct 2025).
   1. Registrate en https://xeno-canto.org/
   2. Verifica tu email y obten la key en tu Account Page
-  3. Ponla en XENO_CANTO_API_KEY (variable de entorno o archivo .secrets/.env)
+  3. Ponla en XENO_CANTO_API_KEY (variable de entorno o .env de la raiz)
 
 Salida: biodiversity_data/xeno_canto/xeno_canto_sounds.csv
 Progreso: biodiversity_data/xeno_canto/xeno_canto_progress.json
@@ -29,6 +29,7 @@ import time
 import logging
 import csv
 from pathlib import Path
+from dotenv import load_dotenv
 from typing import Dict, List, Optional, Set
 from datetime import datetime, date
 
@@ -58,17 +59,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_api_key() -> str:
-    """Lee la API key de variable de entorno o del archivo .secrets/.env."""
-    key = os.getenv("XENO_CANTO_API_KEY", "").strip()
-    if key:
-        return key
-    for fname in [".secrets", ".env"]:
-        p = Path(fname)
-        if p.exists():
-            for line in p.read_text(encoding="utf-8").splitlines():
-                if line.strip().startswith("XENO_CANTO_API_KEY"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+    """Lee XENO_CANTO_API_KEY del entorno o del .env de la raiz del repo."""
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    return os.getenv("XENO_CANTO_API_KEY", "").strip()
 
 
 class XenoCantoFetcher:

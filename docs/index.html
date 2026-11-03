@@ -260,8 +260,8 @@
         <thead><tr><th>Layer</th><th>Technology</th><th>Role</th><th>Port</th></tr></thead>
         <tbody>
           <tr><td>Database</td><td>Neo4j (database <code>linneo</code>)</td><td>Taxonomic graph + enrichment. Auth disabled locally.</td><td>7687 / 7474</td></tr>
-          <tr><td>Backend</td><td>FastAPI (uvicorn)</td><td>Translates HTTP requests into Cypher and returns JSON.</td><td>8000</td></tr>
-          <tr><td>Frontend</td><td>React + Vite</td><td>UI; <code>/api</code> proxy → <code>localhost:8000</code>.</td><td>5173</td></tr>
+          <tr><td>Backend</td><td>FastAPI (uvicorn)</td><td>Translates HTTP requests into Cypher and returns JSON.</td><td>8035</td></tr>
+          <tr><td>Frontend</td><td>React + Vite</td><td>UI; <code>/api</code> proxy → <code>localhost:8035</code>.</td><td>5135</td></tr>
         </tbody>
       </table>
       <p>The runtime flow is linear: the browser calls <code>/api/*</code>, Vite forwards it to the backend, FastAPI runs the Cypher query against Neo4j, and returns JSON that the frontend renders (species pages, graphs, maps). Besides runtime, there's an offline <strong>data pipeline</strong> (Python scripts + Cypher loaders) that populates the database once; see <a href="#pipeline">Pipeline</a>.</p>
@@ -273,13 +273,13 @@
       <h2>Getting started</h2>
       <h3>Backend</h3>
       <pre><code>cd backend
-uvicorn app.main:app --reload   # port 8000
-# Reads credentials from .secrets/.env; default database "linneo", empty password.</code></pre>
+uvicorn app.main:app --reload --port 8035
+# Reads credentials from the root .env (template: .env.example); default database "linneo", empty password.</code></pre>
       <h3>Frontend</h3>
       <pre><code>cd frontend
 npm install        # after any package.json change
-npm run dev        # port 5173, HMR active</code></pre>
-      <p class="muted">Main frontend dependencies: react, react-dom, react-router-dom, leaflet, react-leaflet, d3-force, d3-drag, d3-selection. Standard font across all views: Iosevka.</p>
+npm run dev        # port 5135, HMR active</code></pre>
+      <p class="muted">Main frontend dependencies: react, react-dom, react-router-dom, leaflet, react-leaflet, d3-force. Standard font across all views: Iosevka.</p>
       <div class="callout note"><span class="lab">Golden rule</span><p>uvicorn's <code>--reload</code> only reloads the backend; Vite's HMR reloads the frontend on save. Every change to <code>package.json</code> requires <code>npm install</code>. Never use <code>npm audit fix --force</code>.</p></div>
     </section>
 
@@ -371,13 +371,13 @@ npm run dev        # port 5173, HMR active</code></pre>
           <tr><td><code>xeno_canto_fetcher</code></td><td>Bird sounds</td><td><code>xeno_canto/xeno_canto_sounds.csv</code></td></tr>
         </tbody>
       </table>
-      <p class="muted">Each fetcher keeps its own <code>*_progress</code> and <code>*_fetcher.log</code> to resume and audit. <code>fetcher_template.py</code> is the base template.</p>
+      <p class="muted">Each fetcher keeps its own <code>*_progress</code> and <code>*_fetcher.log</code> to resume and audit.</p>
 
       <h3>2 · Backbone extras</h3>
       <p><code>backbone_extras.py</code> processes the backbone <em>extract</em> (not included in this documentation) and generates <code>backbone_csv/</code>: descriptions (all languages, cleaned HTML), <code>vernacular_es</code> (common names), images, references, and type specimens. Approximate coverage: 1.08M references, 551K descriptions, 224K vernaculars, 192K multimedia, 35K types.</p>
 
       <h3>3 · Cleanup</h3>
-      <p><code>clean4neo4j.py</code> normalizes the CSVs so <code>LOAD CSV</code> can ingest them without errors. <code>peek_csv.py</code> is used to inspect them.</p>
+      <p><code>clean4neo4j.py</code> normalizes the CSVs so <code>LOAD CSV</code> can ingest them without errors.</p>
 
       <h3>4 · Load</h3>
       <p>The loaders in <code>db_loaders/</code> import each layer into Neo4j (one per source):</p>
@@ -504,12 +504,11 @@ cypher_import_sounds.cql</code></pre>
           <tr><td><code>download_all.py</code></td><td>Orchestrator for the download/fetcher pipeline.</td></tr>
           <tr><td><code>backbone_extras.py</code></td><td>Generates CSVs of descriptions/vernaculars/images/refs/types from the backbone.</td></tr>
           <tr><td><code>clean4neo4j.py</code></td><td>Cleans/normalizes CSVs for <code>LOAD CSV</code>.</td></tr>
-          <tr><td><code>peek_csv.py</code></td><td>Quick CSV inspection.</td></tr>
           <tr><td><code>explore_taxon.py</code></td><td>Streaming explorer for Taxon.tsv.</td></tr>
           <tr><td><code>repair_orphans.py</code></td><td>General-purpose orphan repairer.</td></tr>
           <tr><td><code>domain_key.cql</code></td><td>Upper hierarchy Biota → Domain → Kingdom (idempotent).</td></tr>
           <tr><td><code>audit_graph.cql</code></td><td>Integrity audit.</td></tr>
-          <tr><td><code>overview.cql</code>, <code>example_queries.cypher</code></td><td>Reference queries.</td></tr>
+          <tr><td><code>example_queries.cypher</code></td><td>Reference queries.</td></tr>
           <tr><td><code>*.ipynb</code></td><td>Exploration/transformation notebooks (explorar_backbone, explore, relationships, transform).</td></tr>
           <tr><td><code>kanban.md</code>, <code>steps.md</code>, <code>README.md</code></td><td>Planning and process documentation.</td></tr>
         </tbody>

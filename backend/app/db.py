@@ -2,21 +2,16 @@
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-# Cargar credenciales de .secrets o .env (mismo patron que los fetchers)
+# Configuracion en el .env de la raiz del repo (plantilla: .env.example).
+# Las variables de entorno ya definidas (p. ej. en Docker) tienen prioridad.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
+
 def _load_secret(key: str, default: str = "") -> str:
-    val = os.getenv(key)
-    if val:
-        return val
-    for fname in [".secrets", ".env", "../.secrets", "../../.secrets"]:
-        p = Path(fname)
-        if p.exists():
-            for line in p.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if line.startswith(key):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return default
+    return os.getenv(key) or default
 
 
 NEO4J_URI = _load_secret("NEO4J_URI", "bolt://localhost:7687")
