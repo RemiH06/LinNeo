@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 def get_api_key() -> str:
     """Lee XENO_CANTO_API_KEY del entorno o del .env de la raiz del repo."""
-    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
     return os.getenv("XENO_CANTO_API_KEY", "").strip()
 
 

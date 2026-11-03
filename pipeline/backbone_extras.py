@@ -22,8 +22,8 @@ Modelo destino (cargado por cypher_import_backbone.cypher):
   Species.commonNames  (lista; se le agregan los nombres es nuevos, deduplicados)
 
 Uso:
-  python process_backbone_extras.py --all
-  python process_backbone_extras.py --descriptions --images
+  python pipeline/backbone_extras.py --all
+  python pipeline/backbone_extras.py --descriptions --images
 """
 
 import argparse

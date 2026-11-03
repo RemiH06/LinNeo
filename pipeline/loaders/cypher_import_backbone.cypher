@@ -3,7 +3,7 @@
 // ============================================================
 //
 // REQUISITO: nodos Species ya cargados (cypher_import_taxonomy.cypher).
-// Copia a import/ los CSV generados por process_backbone_extras.py:
+// Copia a import/ los CSV generados por pipeline/backbone_extras.py:
 //   backbone_descriptions.csv, backbone_vernacular_es.csv, backbone_images.csv,
 //   backbone_references.csv, backbone_types.csv
 //

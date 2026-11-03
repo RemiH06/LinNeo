@@ -4,15 +4,17 @@ LinNeo - Master Downloader
 Ejecuta todos los fetchers de datos de biodiversidad en orden.
 
 Estructura:
-- data_fetchers/    <- Scripts individuales de cada fuente
-- db_loaders/       <- Scripts Cypher para importar
-- download_all.py   <- Este archivo (orquestador)
+- pipeline/fetchers/      <- Scripts individuales de cada fuente
+- pipeline/loaders/       <- Scripts Cypher para importar
+- pipeline/download_all.py <- Este archivo (orquestador)
+
+Se ejecuta desde la raiz del repo: las rutas de datos son relativas a ella.
 
 Uso:
-    python download_all.py --all              # Ejecuta todos
-    python download_all.py --wikidata         # Solo Wikidata
-    python download_all.py --eol              # Solo EOL
-    python download_all.py --list             # Lista disponibles
+    python pipeline/download_all.py --all              # Ejecuta todos
+    python pipeline/download_all.py --wikidata         # Solo Wikidata
+    python pipeline/download_all.py --eol              # Solo EOL
+    python pipeline/download_all.py --list             # Lista disponibles
 """
 
 import argparse
@@ -25,14 +27,11 @@ from typing import Dict, List, Callable
 
 # ==================== CONFIGURACIÓN ====================
 
-FETCHERS_DIR = Path("data_fetchers")
+FETCHERS_DIR = Path("pipeline/fetchers")
 LOG_DIR = Path("biodiversity_data/.logs")
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Logging (con encoding UTF-8 para Windows)
-import sys
-import io
-
 # Fix para Windows: usar UTF-8 en consola
 if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -83,7 +82,7 @@ AVAILABLE_FETCHERS = {
         "description": "Descarga datos especializados de peces",
         "module": "fishbase_fetcher",
         "function": "fetch_fishbase_data",
-        "output": "biodiversity_data/fishbase/fishbase_data.csv",
+        "output": "biodiversity_data/fishbase/fishbase_fish.csv",
         "time_estimate": "2-3 horas",
         "priority": "IMPORTANTE"
     },
@@ -92,7 +91,7 @@ AVAILABLE_FETCHERS = {
         "description": "Descarga datos de plantas (Kew Gardens)",
         "module": "powo_fetcher",
         "function": "fetch_powo_data",
-        "output": "biodiversity_data/powo/powo_descriptions.csv",
+        "output": "biodiversity_data/powo/powo_plants.csv",
         "time_estimate": "2-3 horas",
         "priority": "IMPORTANTE"
     },
@@ -158,9 +157,9 @@ def import_fetcher(name: str) -> Callable:
     module_name = fetcher_info["module"]
     function_name = fetcher_info["function"]
     
-    # Intentar importar desde data_fetchers/
+    # Intentar importar desde pipeline/fetchers/
     try:
-        module = __import__(f"data_fetchers.{module_name}", fromlist=[function_name])
+        module = __import__(f"fetchers.{module_name}", fromlist=[function_name])
         func = getattr(module, function_name)
         return func
     except ImportError:
@@ -272,9 +271,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos:
-  python download_all.py --all              # Ejecuta todos
-  python download_all.py --wikidata         # Solo Wikidata
-  python download_all.py --list             # Lista disponibles
+  python pipeline/download_all.py --all              # Ejecuta todos
+  python pipeline/download_all.py --wikidata         # Solo Wikidata
+  python pipeline/download_all.py --list             # Lista disponibles
         """
     )
     

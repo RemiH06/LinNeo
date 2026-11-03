@@ -8,10 +8,10 @@ Quita de cada celda:
 
 Uso:
   # Limpiar un archivo especifico (recomendado: directamente el de import/)
-  python clean_csvs_for_neo4j.py "C:\\Users\\hecto\\.Neo4jDesktop2\\...\\import\\wikipedia_descriptions.csv"
+  python pipeline/clean4neo4j.py "C:\\Users\\hecto\\.Neo4jDesktop2\\...\\import\\wikipedia_descriptions.csv"
 
   # O sin argumentos: limpia los CSV conocidos en biodiversity_data/
-  python clean_csvs_for_neo4j.py
+  python pipeline/clean4neo4j.py
 
 Sobreescribe el archivo. Reporta cuantas comillas habia (para confirmar el saneo).
 """

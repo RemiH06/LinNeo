@@ -92,16 +92,19 @@ loaders) that populates the database once from the GBIF backbone.
 ## Data pipeline
 
 ```
-download_all.py                 Orchestrates the enrichment fetchers
-data_fetchers/                  One fetcher per source (Wikipedia, EOL, FishBase,
-                                 POWO, AmphibiaWeb, Wikidata, Wikimedia, Xeno-canto)
-backbone_extras.py               Extracts descriptions/vernaculars/images/refs/types
-clean4neo4j.py                   Normalizes CSVs for LOAD CSV
-db_loaders/                      Cypher loaders, one per source
-repair/                          Graph integrity repair (see below)
+pipeline/
+  download_all.py                Orchestrates the enrichment fetchers
+  fetchers/                      One fetcher per source (Wikipedia, EOL, FishBase,
+                                  POWO, AmphibiaWeb, Wikidata, Wikimedia, Xeno-canto)
+  backbone_extras.py             Extracts descriptions/vernaculars/images/refs/types
+  clean4neo4j.py                 Normalizes CSVs for LOAD CSV
+  loaders/                       Cypher loaders, one per source
+  repair/                        Graph integrity repair (see below)
+  notebooks/                     Node and relationship CSV generation
+explore/                         Audit and reference queries
 ```
 
-Outputs in `biodiversity_data/`; nodes per rank in `taxonomy_nodes_by_rank/`.
+Run every script from the repo root. Outputs in `biodiversity_data/`; nodes per rank in `taxonomy_nodes_by_rank/`.
 
 ## Data model (summary)
 

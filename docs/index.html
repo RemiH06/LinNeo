@@ -357,7 +357,7 @@ npm run dev        # port 5135, HMR active</code></pre>
       <p>Populating the database is a four-stage offline process. Outputs live in <code>biodiversity_data/</code>.</p>
 
       <h3>1 · Download and sources</h3>
-      <p><code>download_all.py</code> orchestrates the <em>fetchers</em>, and <code>data_fetchers/download_biodiversity_data.py</code> downloads the GBIF backbone (<code>backbone.zip</code>), from which taxonomy, distribution (242 countries), and conservation are extracted. Each fetcher adds an enrichment layer:</p>
+      <p><code>pipeline/download_all.py</code> orchestrates the <em>fetchers</em>, and <code>pipeline/fetchers/download_biodiversity_data.py</code> downloads the GBIF backbone (<code>backbone.zip</code>), from which taxonomy, distribution (242 countries), and conservation are extracted. Each fetcher adds an enrichment layer:</p>
       <table>
         <thead><tr><th>Fetcher</th><th>Contributes</th><th>Output</th></tr></thead>
         <tbody>
@@ -374,13 +374,13 @@ npm run dev        # port 5135, HMR active</code></pre>
       <p class="muted">Each fetcher keeps its own <code>*_progress</code> and <code>*_fetcher.log</code> to resume and audit.</p>
 
       <h3>2 · Backbone extras</h3>
-      <p><code>backbone_extras.py</code> processes the backbone <em>extract</em> (not included in this documentation) and generates <code>backbone_csv/</code>: descriptions (all languages, cleaned HTML), <code>vernacular_es</code> (common names), images, references, and type specimens. Approximate coverage: 1.08M references, 551K descriptions, 224K vernaculars, 192K multimedia, 35K types.</p>
+      <p><code>pipeline/backbone_extras.py</code> processes the backbone <em>extract</em> (not included in this documentation) and generates <code>backbone_csv/</code>: descriptions (all languages, cleaned HTML), <code>vernacular_es</code> (common names), images, references, and type specimens. Approximate coverage: 1.08M references, 551K descriptions, 224K vernaculars, 192K multimedia, 35K types.</p>
 
       <h3>3 · Cleanup</h3>
-      <p><code>clean4neo4j.py</code> normalizes the CSVs so <code>LOAD CSV</code> can ingest them without errors.</p>
+      <p><code>pipeline/clean4neo4j.py</code> normalizes the CSVs so <code>LOAD CSV</code> can ingest them without errors.</p>
 
       <h3>4 · Load</h3>
-      <p>The loaders in <code>db_loaders/</code> import each layer into Neo4j (one per source):</p>
+      <p>The loaders in <code>pipeline/loaders/</code> import each layer into Neo4j (one per source):</p>
       <pre><code>cypher_import_taxonomy.cypher       # nodes per rank + hierarchy
 cypher_import_relationships.cypher  # FOUND_IN, PART_OF (geography)
 cypher_import_backbone.cypher       # descriptions/media/refs from the backbone
@@ -501,14 +501,14 @@ cypher_import_sounds.cql</code></pre>
       <table>
         <thead><tr><th>File</th><th>Function</th></tr></thead>
         <tbody>
-          <tr><td><code>download_all.py</code></td><td>Orchestrator for the download/fetcher pipeline.</td></tr>
-          <tr><td><code>backbone_extras.py</code></td><td>Generates CSVs of descriptions/vernaculars/images/refs/types from the backbone.</td></tr>
-          <tr><td><code>clean4neo4j.py</code></td><td>Cleans/normalizes CSVs for <code>LOAD CSV</code>.</td></tr>
+          <tr><td><code>pipeline/download_all.py</code></td><td>Orchestrator for the download/fetcher pipeline.</td></tr>
+          <tr><td><code>pipeline/backbone_extras.py</code></td><td>Generates CSVs of descriptions/vernaculars/images/refs/types from the backbone.</td></tr>
+          <tr><td><code>pipeline/clean4neo4j.py</code></td><td>Cleans/normalizes CSVs for <code>LOAD CSV</code>.</td></tr>
           <tr><td><code>explore_taxon.py</code></td><td>Streaming explorer for Taxon.tsv.</td></tr>
           <tr><td><code>repair_orphans.py</code></td><td>General-purpose orphan repairer.</td></tr>
           <tr><td><code>domain_key.cql</code></td><td>Upper hierarchy Biota → Domain → Kingdom (idempotent).</td></tr>
           <tr><td><code>audit_graph.cql</code></td><td>Integrity audit.</td></tr>
-          <tr><td><code>example_queries.cypher</code></td><td>Reference queries.</td></tr>
+          <tr><td><code>explore/example_queries.cypher</code></td><td>Reference queries.</td></tr>
           <tr><td><code>*.ipynb</code></td><td>Exploration/transformation notebooks (explorar_backbone, explore, relationships, transform).</td></tr>
           <tr><td><code>kanban.md</code>, <code>steps.md</code>, <code>README.md</code></td><td>Planning and process documentation.</td></tr>
         </tbody>
@@ -519,8 +519,8 @@ cypher_import_sounds.cql</code></pre>
         <thead><tr><th>Folder</th><th>Contents</th></tr></thead>
         <tbody>
           <tr><td><code>backend/app/</code></td><td><code>main.py</code>, <code>queries.py</code>, <code>db.py</code>.</td></tr>
-          <tr><td><code>data_fetchers/</code></td><td>One fetcher per source + template + GBIF downloader.</td></tr>
-          <tr><td><code>db_loaders/</code></td><td>Cypher loaders, one per source.</td></tr>
+          <tr><td><code>pipeline/fetchers/</code></td><td>One fetcher per source + GBIF downloader.</td></tr>
+          <tr><td><code>pipeline/loaders/</code></td><td>Cypher loaders, one per source.</td></tr>
           <tr><td><code>frontend/src/</code></td><td>App, pages, components, backgrounds, themes, API client.</td></tr>
           <tr><td><code>biodiversity_data/</code></td><td>Pipeline outputs: nodes per rank, relationships, backbone_csv, orphan_csv, and one folder per fetcher.</td></tr>
           <tr><td><code>docs/img/</code></td><td><code>schema.png</code> and the numbered <code>ln_ss*.png</code> screenshots.</td></tr>
