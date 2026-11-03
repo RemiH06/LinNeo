@@ -26,6 +26,11 @@ from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime, date
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA  # noqa: E402
+from match import name_map  # noqa: E402
+
 # ==================== CONFIGURACION ====================
 
 # FishBase ahora se aloja en HuggingFace (rfishbase 5.0). Version snapshot:
@@ -36,7 +41,7 @@ SPECIES_PARQUET_URL = (
 )
 MAX_PARAGRAPHS = 2
 
-OUTPUT_DIR = Path("biodiversity_data/fishbase")
+OUTPUT_DIR = DATA / "fishbase"
 OUTPUT_FILE = OUTPUT_DIR / "fishbase_fish.csv"
 PARQUET_LOCAL = OUTPUT_DIR / "species.parquet"
 LOG_FILE = OUTPUT_DIR / "fishbase_fetcher.log"
@@ -88,7 +93,7 @@ def build_habit(row) -> str:
 
 
 class FishBaseFetcher:
-    def __init__(self, output_dir: str = "biodiversity_data/fishbase"):
+    def __init__(self, output_dir: Path = DATA / "fishbase"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.csv_path = self.output_dir / "fishbase_fish.csv"
@@ -116,25 +121,7 @@ class FishBaseFetcher:
             return False
 
     def load_gbif_name_map(self) -> Dict[str, int]:
-        logger.info("Cargando nombres de GBIF...")
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return {}
-        try:
-            df = pd.read_csv(gbif_file, usecols=['species_key', 'scientific_name', 'canonical_name'], low_memory=False)
-            name_map = {}
-            for key, sci, canon in zip(df['species_key'], df['scientific_name'], df['canonical_name']):
-                skey = int(key)
-                if pd.notna(canon):
-                    name_map[canon.lower().strip()] = skey
-                if pd.notna(sci):
-                    name_map.setdefault(sci.lower().strip(), skey)
-            logger.info(f"Cargados {len(name_map)} nombres de GBIF")
-            return name_map
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return {}
+        return name_map(kingdoms=["Animalia"])
 
     def process(self, name_map: Dict[str, int]):
         logger.info("=" * 60)

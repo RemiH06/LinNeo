@@ -10,6 +10,9 @@ TAXON_TSV = BACKBONE / "Taxon.tsv"
 OUT = DATA / "v2"
 TAXA = OUT / "taxa.parquet"
 SYNONYMS = OUT / "synonyms.parquet"
+ENRICHED = OUT / "enriched"
+REJECTS = OUT / "rejects.parquet"
+WIKIDATA_DIR = DATA / "wikidata"
 
 # Orden de la jerarquía: un padre siempre tiene nivel menor que su hijo.
 RANK_LEVEL = {

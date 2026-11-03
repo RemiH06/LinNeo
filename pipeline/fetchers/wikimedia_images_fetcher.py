@@ -28,6 +28,11 @@ from typing import Dict, List, Optional, Set
 from datetime import datetime, date
 from urllib.parse import quote
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA  # noqa: E402
+from match import unique_names  # noqa: E402
+
 # ==================== CONFIGURACION ====================
 
 LANGUAGES = ["en", "es"]
@@ -36,7 +41,7 @@ WIKIPEDIA_API = "https://{lang}.wikipedia.org/w/api.php"
 # Filtrar por reino (None = todos). Ej: ["Animalia", "Plantae", "Fungi"]
 KINGDOM_FILTER = None
 
-OUTPUT_DIR = Path("biodiversity_data/images")
+OUTPUT_DIR = DATA / "images"
 OUTPUT_FILE = OUTPUT_DIR / "wikimedia_images.csv"
 PROGRESS_FILE = OUTPUT_DIR / "wikimedia_images_progress.txt"
 LOG_FILE = OUTPUT_DIR / "wikimedia_images_fetcher.log"
@@ -61,7 +66,7 @@ logger = logging.getLogger(__name__)
 class WikimediaImagesFetcher:
     """Descarga URLs de imagen principal via Wikipedia pageimages, con resume."""
 
-    def __init__(self, output_dir: str = "biodiversity_data/images"):
+    def __init__(self, output_dir: Path = DATA / "images"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.csv_path = self.output_dir / "wikimedia_images.csv"
@@ -113,28 +118,7 @@ class WikimediaImagesFetcher:
     # ---------- Carga de especies ----------
 
     def load_gbif_species(self, kingdom_filter: Optional[List[str]] = None) -> pd.DataFrame:
-        logger.info("Cargando especies de GBIF...")
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return pd.DataFrame()
-        try:
-            df = pd.read_csv(
-                gbif_file,
-                usecols=['species_key', 'canonical_name', 'kingdom'],
-                low_memory=False
-            )
-            df = df.dropna(subset=['species_key', 'canonical_name'])
-            if kingdom_filter:
-                df = df[df['kingdom'].isin(kingdom_filter)]
-                logger.info(f"Filtrado a reinos {kingdom_filter}")
-            df = df.drop_duplicates(subset=['canonical_name'])
-            df['species_key'] = df['species_key'].astype(int)
-            logger.info(f"Cargadas {len(df)} especies")
-            return df[['species_key', 'canonical_name']].reset_index(drop=True)
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return pd.DataFrame()
+        return unique_names(kingdoms=kingdom_filter)
 
     # ---------- Descarga ----------
 

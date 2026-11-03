@@ -33,6 +33,11 @@ from dotenv import load_dotenv
 from typing import Dict, List, Optional, Set
 from datetime import datetime, date
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA  # noqa: E402
+from match import name_map  # noqa: E402
+
 # ==================== CONFIGURACION ====================
 
 # Grupos de Xeno-canto (identificadores tal como en la web)
@@ -40,7 +45,7 @@ GROUPS = ["birds", "grasshoppers", "bats", "frogs", "land mammals"]
 
 XENO_CANTO_API = "https://xeno-canto.org/api/3/recordings"
 
-OUTPUT_DIR = Path("biodiversity_data/xeno_canto")
+OUTPUT_DIR = DATA / "xeno_canto"
 OUTPUT_FILE = OUTPUT_DIR / "xeno_canto_sounds.csv"
 PROGRESS_FILE = OUTPUT_DIR / "xeno_canto_progress.json"
 LOG_FILE = OUTPUT_DIR / "xeno_canto_fetcher.log"
@@ -67,7 +72,7 @@ def get_api_key() -> str:
 class XenoCantoFetcher:
     """Descarga un sonido por especie recorriendo los grupos de Xeno-canto."""
 
-    def __init__(self, api_key: str, output_dir: str = "biodiversity_data/xeno_canto"):
+    def __init__(self, api_key: str, output_dir: Path = DATA / "xeno_canto"):
         self.api_key = api_key
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -122,26 +127,7 @@ class XenoCantoFetcher:
     # ---------- GBIF name map ----------
 
     def load_gbif_name_map(self) -> Dict[str, int]:
-        """{nombre_lower: species_key} usando canonical_name (+ scientific fallback)."""
-        logger.info("Cargando nombres de GBIF...")
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return {}
-        try:
-            df = pd.read_csv(gbif_file, usecols=['species_key', 'scientific_name', 'canonical_name'], low_memory=False)
-            name_map = {}
-            for key, sci, canon in zip(df['species_key'], df['scientific_name'], df['canonical_name']):
-                skey = int(key)
-                if pd.notna(canon):
-                    name_map[canon.lower().strip()] = skey
-                if pd.notna(sci):
-                    name_map.setdefault(sci.lower().strip(), skey)
-            logger.info(f"Cargados {len(name_map)} nombres de GBIF")
-            return name_map
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return {}
+        return name_map(kingdoms=["Animalia"])
 
     # ---------- Descarga ----------
 

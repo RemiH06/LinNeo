@@ -29,6 +29,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 from datetime import datetime, date
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA  # noqa: E402
+from match import unique_names  # noqa: E402
+
 # ==================== CONFIGURACION ====================
 
 WORKERS = 8                # hilos concurrentes
@@ -38,7 +43,7 @@ MAX_PARAGRAPHS = 2
 POWO_SEARCH = "https://powo.science.kew.org/api/2/search"
 POWO_TAXON = "https://powo.science.kew.org/api/2/taxon/{ipni_id}"
 
-OUTPUT_DIR = Path("biodiversity_data/powo")
+OUTPUT_DIR = DATA / "powo"
 OUTPUT_FILE = OUTPUT_DIR / "powo_plants.csv"
 PROGRESS_FILE = OUTPUT_DIR / "powo_progress.txt"
 LOG_FILE = OUTPUT_DIR / "powo_fetcher.log"
@@ -175,7 +180,7 @@ def process_one(item: Tuple[int, str]) -> Tuple[int, Optional[Dict]]:
 
 
 class POWOFetcher:
-    def __init__(self, output_dir: str = "biodiversity_data/powo"):
+    def __init__(self, output_dir: Path = DATA / "powo"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.csv_path = self.output_dir / "powo_plants.csv"
@@ -211,24 +216,7 @@ class POWOFetcher:
                 f.write(f"{k}\n")
 
     def load_gbif_plants(self) -> pd.DataFrame:
-        logger.info("Cargando plantas de GBIF...")
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return pd.DataFrame()
-        try:
-            df = pd.read_csv(gbif_file, usecols=['species_key', 'canonical_name', 'kingdom', 'rank'], low_memory=False)
-            df = df.dropna(subset=['species_key', 'canonical_name'])
-            df = df[df['kingdom'] == 'Plantae']
-            if 'rank' in df.columns:
-                df = df[df['rank'].astype(str).str.upper() == 'SPECIES']
-            df = df.drop_duplicates(subset=['canonical_name'])
-            df['species_key'] = df['species_key'].astype(int)
-            logger.info(f"Cargadas {len(df)} plantas")
-            return df[['species_key', 'canonical_name']].reset_index(drop=True)
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return pd.DataFrame()
+        return unique_names(kingdoms=["Plantae"], rank="species")
 
     def download(self, species_df: pd.DataFrame):
         logger.info("=" * 60)

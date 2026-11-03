@@ -18,11 +18,16 @@ from typing import Dict, List, Optional
 from difflib import SequenceMatcher
 from datetime import datetime
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA  # noqa: E402
+from match import name_map  # noqa: E402
+
 # ==================== CONFIGURACIÓN ====================
 
 LANGUAGES = ["en", "es", "fr", "de", "pt", "ja", "zh", "it", "ru", "nl"]
 WIKIDATA_SPARQL = "https://query.wikidata.org/sparql"
-OUTPUT_DIR = Path("biodiversity_data/wikidata")
+OUTPUT_DIR = DATA / "wikidata"
 LOG_FILE = OUTPUT_DIR / "wikidata_fetcher.log"
 
 # Crear directorio antes de configurar logging
@@ -43,7 +48,7 @@ logger = logging.getLogger(__name__)
 class WikidataCommonNamesFetcher:
     """Descarga y procesa nombres comunes desde Wikidata"""
     
-    def __init__(self, output_dir: str = "biodiversity_data/wikidata"):
+    def __init__(self, output_dir: Path = DATA / "wikidata"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.sparql_endpoint = WIKIDATA_SPARQL
@@ -219,42 +224,8 @@ class WikidataCommonNamesFetcher:
         return pd.DataFrame(matched_records)
     
     def load_gbif_species_names(self) -> Dict[str, str]:
-        """
-        Carga nombres de GBIF desde CSV para matching.
-        Usa canonical_name (sin autor) que coincide con P225 de Wikidata,
-        y tambien scientific_name como fallback.
-        
-        Returns:
-            {nombre_lower: species_key}
-        """
-        
-        logger.info("Cargando species_keys de GBIF...")
-        
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return {}
-        
-        try:
-            df = pd.read_csv(gbif_file, usecols=['species_key', 'scientific_name', 'canonical_name'])
-            
-            species_map = {}
-            for key, sci, canon in zip(df['species_key'], df['scientific_name'], df['canonical_name']):
-                skey = str(key)
-                # canonical_name primero (coincide con Wikidata P225)
-                if pd.notna(canon):
-                    species_map[canon.lower().strip()] = skey
-                # scientific_name como fallback (no sobreescribe canonical)
-                if pd.notna(sci):
-                    species_map.setdefault(sci.lower().strip(), skey)
-            
-            logger.info(f"Cargados {len(species_map)} nombres de GBIF")
-            return species_map
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return {}
-    
+        return name_map()
+
     def save_to_csv(self, df: pd.DataFrame, filename: str = "wikidata_common_names.csv"):
         """Guarda DataFrame a CSV."""
         

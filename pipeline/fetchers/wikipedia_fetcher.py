@@ -16,6 +16,7 @@ Columnas: species_key, text, lang, source_name, source_url, accessed_date
 Estructura consistente con wikidata_fetcher.py
 """
 
+import duckdb
 import requests
 import pandas as pd
 import time
@@ -25,6 +26,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 from datetime import datetime, date
 from urllib.parse import quote
+
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from config import DATA, ENRICHED, SYNONYMS, TAXA, WIKIDATA_DIR  # noqa: E402
+from match import unique_names  # noqa: E402
 
 # ==================== CONFIGURACION ====================
 
@@ -39,7 +45,7 @@ KINGDOM_FILTER = None
 # Cuantos parrafos guardar
 MAX_PARAGRAPHS = 2
 
-OUTPUT_DIR = Path("biodiversity_data/descriptions")
+OUTPUT_DIR = DATA / "descriptions"
 OUTPUT_FILE = OUTPUT_DIR / "wikipedia_descriptions.csv"
 PROGRESS_FILE = OUTPUT_DIR / "wikipedia_progress.txt"
 LOG_FILE = OUTPUT_DIR / "wikipedia_fetcher.log"
@@ -69,10 +75,35 @@ def first_n_paragraphs(text: str, n: int = MAX_PARAGRAPHS) -> str:
     return "\n\n".join(paragraphs[:n])
 
 
+def missing_titles_keys(lang: str) -> List[tuple]:
+    """(título, taxonID) enlazados por Wikidata a un solo nodo sin texto en lang."""
+    gbif_links = (WIKIDATA_DIR / f"gbif_{lang}.tsv").as_posix()
+    return duckdb.sql(f"""
+        WITH links AS (
+            SELECT replace(url_decode(regexp_extract(title, '/wiki/(.*)>', 1)), '_', ' ') AS title,
+                   TRY_CAST(trim(gbif, '"') AS BIGINT) AS gbif
+            FROM read_csv('{gbif_links}', delim='\t', header=true, quote='', escape='',
+                          names=['item', 'gbif', 'title'], all_varchar=true)
+        ), nodes AS (
+            SELECT taxonID AS id, taxonID FROM read_parquet('{TAXA.as_posix()}')
+            UNION ALL
+            SELECT taxonID, acceptedID FROM read_parquet('{SYNONYMS.as_posix()}')
+        )
+        SELECT l.title, min(n.taxonID)
+        FROM links l JOIN nodes n ON l.gbif = n.id
+        WHERE n.taxonID NOT IN (
+            SELECT taxonID FROM read_parquet('{(ENRICHED / "wikipedia.parquet").as_posix()}')
+            WHERE lang = '{lang}')
+        GROUP BY l.title
+        HAVING count(DISTINCT n.taxonID) = 1
+        ORDER BY l.title
+    """).fetchall()
+
+
 class WikipediaDescriptionsFetcher:
     """Descarga descripciones (2 parrafos) desde Wikipedia con resume."""
 
-    def __init__(self, output_dir: str = "biodiversity_data/descriptions"):
+    def __init__(self, output_dir: Path = DATA / "descriptions"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.csv_path = self.output_dir / "wikipedia_descriptions.csv"
@@ -128,33 +159,7 @@ class WikipediaDescriptionsFetcher:
     # ---------- Carga de especies ----------
 
     def load_gbif_species(self, kingdom_filter: Optional[List[str]] = None) -> pd.DataFrame:
-        """Carga species_key + canonical_name de GBIF (opcionalmente por reino)."""
-        logger.info("Cargando especies de GBIF...")
-
-        gbif_file = Path("biodiversity_data/gbif_taxonomy.csv")
-        if not gbif_file.exists():
-            logger.error(f"No se encontro: {gbif_file}")
-            return pd.DataFrame()
-
-        try:
-            df = pd.read_csv(
-                gbif_file,
-                usecols=['species_key', 'canonical_name', 'kingdom'],
-                low_memory=False
-            )
-            df = df.dropna(subset=['species_key', 'canonical_name'])
-
-            if kingdom_filter:
-                df = df[df['kingdom'].isin(kingdom_filter)]
-                logger.info(f"Filtrado a reinos {kingdom_filter}")
-
-            df = df.drop_duplicates(subset=['canonical_name'])
-            df['species_key'] = df['species_key'].astype(int)
-            logger.info(f"Cargadas {len(df)} especies")
-            return df[['species_key', 'canonical_name']].reset_index(drop=True)
-        except Exception as e:
-            logger.error(f"Error cargando GBIF: {e}")
-            return pd.DataFrame()
+        return unique_names(kingdoms=kingdom_filter)
 
     # ---------- Descarga ----------
 
@@ -225,6 +230,40 @@ class WikipediaDescriptionsFetcher:
                 results[original] = text
 
         return results
+
+    def download_missing(self, lang: str, limit: Optional[int] = None):
+        """Baja los artículos que Wikidata enlaza a un nodo que aún no tiene texto en lang.
+
+        El título viene del enlace del item, no del nombre del taxón: así se alcanzan
+        artículos como Bandfish, que por nombre nunca aparecieron. Lleva su propio
+        progreso por título; un lote fallido no se marca y se reintenta en otra corrida.
+        """
+        progress = self.output_dir / f"wikipedia_missing_{lang}.txt"
+        done = set(progress.read_text(encoding='utf-8').splitlines()) if progress.exists() else set()
+        keys = dict(missing_titles_keys(lang))
+        pending = [t for t in keys if t not in done][:limit]
+        logger.info(f"Artículos pendientes en {lang}: {len(pending)}")
+
+        accessed = date.today().isoformat()
+        self._ensure_csv_header()
+        for i in range(0, len(pending), BATCH_TITLES):
+            batch = pending[i:i + BATCH_TITLES]
+            found = self.fetch_batch(batch, lang)
+            if not found:
+                continue
+            self.append_records([{
+                'species_key': keys[title],
+                'text': text,
+                'lang': lang,
+                'source_name': 'wikipedia',
+                'source_url': f"https://{lang}.wikipedia.org/wiki/{quote(title.replace(' ', '_'))}",
+                'accessed_date': accessed,
+            } for title, text in found.items()])
+            with open(progress, 'a', encoding='utf-8') as f:
+                f.write("".join(f"{title}\n" for title in batch))
+            time.sleep(0.3)
+            if (i // BATCH_TITLES) % FLUSH_EVERY == 0:
+                logger.info(f"  Progreso: {i + len(batch)}/{len(pending)}")
 
     def download_descriptions(self, species_df: pd.DataFrame):
         """
@@ -346,4 +385,9 @@ def fetch_wikipedia_descriptions(kingdom_filter: Optional[List[str]] = KINGDOM_F
 
 
 if __name__ == "__main__":
-    fetch_wikipedia_descriptions()
+    # --missing <lang> [limite]: solo lo que falta, por título de Wikidata.
+    if len(sys.argv) > 2 and sys.argv[1] == "--missing":
+        limit = int(sys.argv[3]) if len(sys.argv) > 3 else None
+        WikipediaDescriptionsFetcher().download_missing(sys.argv[2], limit)
+    else:
+        fetch_wikipedia_descriptions()
