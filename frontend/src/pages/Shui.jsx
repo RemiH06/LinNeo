@@ -2,10 +2,9 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import ShuiGraph from '../components/ShuiGraph'
-import ShuiBackground from '../backgrounds/ShuiBackground'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
-import { KINGDOM_HUE } from '../theme/kingdomColor'
+import { kingdomInk } from '../theme/kingdomColor'
 import ThemeToggle from '../components/ThemeToggle'
 import LinNeoLogo from '../components/LinNeoLogo'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -13,18 +12,9 @@ import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import '../theme/shui.css'
 
-function glowFor(kingdom, dark) {
-  const h = KINGDOM_HUE[kingdom]
-  const gray = (kingdom === 'incertae sedis' || h == null)
-  const hue = gray ? 210 : h
-  const sat = gray ? 12 : (dark ? 80 : 65)
-  return `hsl(${hue}, ${sat}%, ${dark ? 55 : 48}%)`
-}
-function swatchFor(kingdom, dark) {
-  const h = KINGDOM_HUE[kingdom]
-  const gray = (kingdom === 'incertae sedis' || h == null)
-  return `hsl(${gray ? 210 : h}, ${gray ? 12 : 80}%, ${dark ? 55 : 45}%)`
-}
+// Hex de 6 dígitos: el resplandor le agrega alfa (`${glowFor(...)}55`).
+const glowFor = kingdomInk
+const swatchFor = kingdomInk
 
 const RANK_ES_SHORT = {
   domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase',
@@ -335,7 +325,6 @@ export default function Shui() {
 
   return (
     <div className="shui-scope">
-      <ShuiBackground />
       {/* luz del reino al hacer focus */}
       <div className="sh-kingdom-glow" style={{
         background: focusKingdom

@@ -1,0 +1,10 @@
+/* Generado por scripts/kingdom-palette.cjs --write. No editar a mano. */
+[data-kingdom="Animalia"] { --kd-wash: #FED6C6; --kd-ink: #983803; --kn-paper: #31150A; --kn-ink: #FB9167; }
+[data-kingdom="Archaea"] { --kd-wash: #F6DCAB; --kd-ink: #755502; --kn-paper: #291C00; --kn-ink: #DCA833; }
+[data-kingdom="Plantae"] { --kd-wash: #CEEABB; --kd-ink: #3B6901; --kn-paper: #142308; --kn-ink: #8DC463; }
+[data-kingdom="Chromista"] { --kd-wash: #AFF0DD; --kd-ink: #026B58; --kn-paper: #00251D; --kn-ink: #19CDAC; }
+[data-kingdom="Viruses"] { --kd-wash: #BEE6FF; --kd-ink: #05628A; --kn-paper: #002132; --kn-ink: #40BEFD; }
+[data-kingdom="Bacteria"] { --kd-wash: #D9DDFF; --kd-ink: #4E4DA6; --kn-paper: #1A1B35; --kn-ink: #A2A8FE; }
+[data-kingdom="Fungi"] { --kd-wash: #F6D1FC; --kd-ink: #7D3B8A; --kn-paper: #29152C; --kn-ink: #D992E7; }
+[data-kingdom="Protozoa"] { --kd-wash: #FFD2DD; --kd-ink: #963056; --kn-paper: #31131D; --kn-ink: #F889AC; }
+[data-kingdom="incertae sedis"] { --kd-wash: #D8E0EB; --kd-ink: #4E5C6F; --kn-paper: #1A1E24; --kn-ink: #A3B3C8; }

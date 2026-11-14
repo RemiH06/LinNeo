@@ -165,7 +165,7 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
         // etiquetas: centro, reinos/dominios y filos; el resto en zoom alto
         const showLabel = n.rank === 'biota' || n.rank === 'domain' || n.rank === 'kingdom' || n.id === data.center || view.k > 1.4 || n.rank === 'phylum'
         if (showLabel) {
-          ctx.font = `${n.id === data.center ? 'bold ' : ''}${11 / view.k}px Recursive, monospace`
+          ctx.font = `${n.id === data.center ? 'bold ' : ''}${11 / view.k}px 'Libre Caslon Text', Georgia, serif`
           ctx.fillStyle = textColor; ctx.textAlign = 'left'
           ctx.fillText(n.name, n.x + r + 3, n.y + 3)
         }

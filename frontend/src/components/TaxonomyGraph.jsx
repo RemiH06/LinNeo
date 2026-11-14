@@ -142,7 +142,7 @@ export default function TaxonomyGraph({ lineage = [], relatives, currentName, cu
         ctx.globalAlpha = 1
         const showLabel = !n.sibling || hoverRef.current === n.id || n.current
         if (showLabel) {
-          ctx.font = `${n.current ? 'bold ' : ''}${10 / view.k}px Iosevka, monospace`
+          ctx.font = `${n.current ? 'bold ' : ''}${10 / view.k}px 'Libre Caslon Text', Georgia, serif`
           ctx.fillStyle = textColor
           ctx.textAlign = 'left'
           ctx.fillText(n.name, n.x + r + 3, n.y + 3)

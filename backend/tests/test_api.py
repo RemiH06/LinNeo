@@ -200,12 +200,14 @@ class ApiTest(unittest.TestCase):
         self.get(f"/taxon/{ONCA}", status=404)
 
     def test_taxon_children_mixed_ranks_and_paging(self):
+        # Rango más alto primero aunque el nombre ordene después (Mammalia > Jaguaria).
         t = self.get("/taxon/44?limit=1")
         self.assertEqual(t["children_total"], 2)
+        self.assertEqual(t["child_ranks"], [{"rank": "class", "n": 1}, {"rank": "genus", "n": 1}])
+        self.assertEqual([c["name"] for c in t["children"]], ["Mammalia"])
+        t = self.get("/taxon/44?limit=1&offset=1")
         self.assertEqual([c["name"] for c in t["children"]], ["Jaguaria"])
         self.assertEqual(t["children"][0]["flags"]["species"], 1)
-        t = self.get("/taxon/44?limit=1&offset=1")
-        self.assertEqual([c["name"] for c in t["children"]], ["Mammalia"])
 
     def test_gallery(self):
         g = self.get("/taxon/-1/gallery")

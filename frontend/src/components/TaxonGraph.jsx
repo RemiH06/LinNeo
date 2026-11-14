@@ -103,7 +103,7 @@ export default function TaxonGraph({ lineage = [], current, children = [], kingd
         ctx.globalAlpha = 1
         const showLabel = !n.child || n.current
         if (showLabel) {
-          ctx.font = `${n.current ? 'bold ' : ''}${10 / view.k}px Iosevka, monospace`
+          ctx.font = `${n.current ? 'bold ' : ''}${10 / view.k}px 'Libre Caslon Text', Georgia, serif`
           ctx.fillStyle = textColor; ctx.textAlign = 'left'
           ctx.fillText(n.name, n.x + r + 3, n.y + 3)
         }

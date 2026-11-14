@@ -240,9 +240,12 @@ def taxon_node(key, offset=0, limit=500):
     node = _taxon(key)
     if node is None:
         return None
+    # Primero los rangos más altos: Animalia tiene ~3.5k hijos directos (géneros y familias
+    # sin filo) y por nombre los filos quedaban fuera de la primera página.
     rows = _run(f"""
         MATCH (n:Taxon {{taxonID: $key}})-[:HAS_CHILD]->(c)
-        WITH c ORDER BY c.name SKIP $offset LIMIT $limit
+        WITH c ORDER BY [i IN range(0, size($ranks) - 1) WHERE $ranks[i] = c.rank][0], c.name
+        SKIP $offset LIMIT $limit
         RETURN CASE WHEN c:Species THEN c {{
                    .name, key: c.taxonID, .rank, conservation: c.conservation_overall_code,
                    images: COLLECT {{ MATCH (c)-[:HAS_MEDIA]->(m:Media) WHERE m.media_type = 'image'
@@ -252,7 +255,7 @@ def taxon_node(key, offset=0, limit=500):
                    flags: {_f(SPECIES_FLAGS, 'c')}
                }} ELSE c {{ .name, key: c.taxonID, .rank, flags: {_f(TAXON_FLAGS, 'c')} }}
                END AS child
-    """, key=key, offset=offset, limit=limit)
+    """, key=key, offset=offset, limit=limit, ranks=list(RANKS))
     children = [r["child"] for r in rows]
     for c in children:
         if "images" in c:
@@ -260,11 +263,13 @@ def taxon_node(key, offset=0, limit=500):
             c["flags"]["countries"] = len(c["countries"])
     ranks = _run("""
         MATCH (:Taxon {taxonID: $key})-[:HAS_CHILD]->(c)
-        RETURN c.rank AS rank, count(*) AS n ORDER BY n DESC LIMIT 1
+        RETURN c.rank AS rank, count(*) AS n
     """, key=key)
+    ranks.sort(key=lambda r: RANKS.index(r["rank"]) if r["rank"] in RANKS else len(RANKS))
     return {
         "key": key, "name": node["name"], "rank": node["rank"], "kingdom": node["kingdom"],
-        "child_rank": ranks[0]["rank"] if ranks else None,
+        "child_rank": max(ranks, key=lambda r: r["n"])["rank"] if ranks else None,
+        "child_ranks": ranks,  # [{rank, n}] de más alto a más bajo, en el mismo orden que children
         "children": children,
         "children_total": node["children_total"],
         "offset": offset,

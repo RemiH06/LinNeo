@@ -1,10 +1,15 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 
-// Guarda el reino "activo" (el de la vista actual) para que el fondo se tinte.
+// Guarda el reino "activo" (el de la vista actual). Se refleja en body[data-kingdom]:
+// de día pone el lavado de su pigmento, de noche vira el papel (ver systema.css).
 const KingdomContext = createContext({ kingdom: null, setKingdom: () => {} })
 
 export function KingdomProvider({ children }) {
   const [kingdom, setKingdom] = useState(null)
+  useEffect(() => {
+    if (kingdom) document.body.dataset.kingdom = kingdom
+    else delete document.body.dataset.kingdom
+  }, [kingdom])
   return (
     <KingdomContext.Provider value={{ kingdom, setKingdom }}>
       {children}
