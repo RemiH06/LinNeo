@@ -109,7 +109,8 @@ def main():
         match_taxon(con, "q")
         con.execute(f"INSERT INTO rejects SELECT '{name}', qkey, name, reason FROM unmatched")
         con.execute(f"""
-            COPY (SELECT m.taxonID, m.method, src.* EXCLUDE (species_key)
+            COPY (SELECT m.taxonID, m.method, src.species_key AS source_key,
+                         src.* EXCLUDE (species_key)
                   FROM {source} src JOIN matched m ON {qkey_of(route)} = m.qkey)
             TO '{(ENRICHED / f"{name}.parquet").as_posix()}' (FORMAT parquet, COMPRESSION zstd)
         """)

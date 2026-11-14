@@ -244,7 +244,7 @@ class XenoCantoFetcher:
 
 
 def fetch_xeno_canto_urls():
-    """Funcion principal. Llamada por download_all.py"""
+    """Funcion principal."""
     logger.info(f"Inicio: {datetime.now()}")
 
     api_key = get_api_key()

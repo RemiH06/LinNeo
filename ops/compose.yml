@@ -1,0 +1,27 @@
+# Neo4j Community de LinNeo en el Docker del WSL de Pixilate.
+# Solo escucha en localhost; sin auth mientras sea local (S6 la activa antes de publicar).
+name: linneo
+services:
+  neo4j:
+    image: neo4j:5.26.33-community
+    restart: "no"
+    # Neo4j hace checkpoint al apagarse; los 10 s por defecto lo matan a medias.
+    stop_grace_period: 2m
+    environment:
+      NEO4J_AUTH: none
+      # Comparte el WSL (16 GB) con Mapo, NetZero y los Bakers: memoria acotada.
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_pagecache_size: 2G
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - data:/data
+      - logs:/logs
+      - ../biodiversity_data/v2/import:/import:ro
+      - ./schema.cypher:/schema.cypher:ro
+
+volumes:
+  data:
+  logs:

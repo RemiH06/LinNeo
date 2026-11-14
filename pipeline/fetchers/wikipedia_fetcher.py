@@ -368,7 +368,7 @@ class WikipediaDescriptionsFetcher:
 
 
 def fetch_wikipedia_descriptions(kingdom_filter: Optional[List[str]] = KINGDOM_FILTER):
-    """Funcion principal. Llamada por download_all.py"""
+    """Funcion principal."""
     logger.info(f"Inicio: {datetime.now()}")
 
     fetcher = WikipediaDescriptionsFetcher()

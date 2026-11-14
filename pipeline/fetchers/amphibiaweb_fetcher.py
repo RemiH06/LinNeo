@@ -269,7 +269,7 @@ class AmphibiaWebFetcher:
 
 
 def fetch_amphibiaweb_data():
-    """Funcion principal. Llamada por download_all.py"""
+    """Funcion principal."""
     logger.info(f"Inicio: {datetime.now()}")
 
     fetcher = AmphibiaWebFetcher()

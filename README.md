@@ -63,26 +63,25 @@ loaders) that populates the database once from the GBIF backbone.
 ## Installation
 
 ```
-- Requires Neo4j (Desktop or Enterprise) running locally before importing data.
-- The full GBIF backbone requires a Neo4j heap of at least 4-8 GB.
+- Linux (or WSL) with Docker and uv. The pipeline needs ~8 GB of disk and ~4 GB of RAM.
+- Neo4j Community 5.26 runs in Docker (ops/compose.yml), bound to localhost only.
 ```
 
-1. Install Python dependencies: `pip install -r requirements.txt`
-2. Create a Neo4j database named `linneo` (auth disabled or empty password locally).
-3. Adjust heap in `neo4j.conf` if needed:
+1. Create the pipeline venv: `uv venv && uv pip install -r pipeline/requirements.txt`
+2. Copy `.env.example` to `.env` at the project root (it's in `.gitignore`) and fill in the values.
+3. Build the data and load the graph (see details below):
    ```
-   server.memory.heap.initial_size=4G
-   server.memory.heap.max_size=8G
-   server.memory.pagecache.size=4G
+   bash ops/build.sh                        # backbone tree + enrichment
+   ops/run.sh pipeline/04_export.py         # CSVs for neo4j-admin import
+   bash ops/import.sh                       # import, constraints, fulltext
+   ops/run.sh pipeline/05_check_graph.py    # validates the loaded graph
    ```
-4. Copy `.env.example` to `.env` at the project root (it's in `.gitignore`) and fill in the values.
-5. Run the data pipeline (see details below) until Neo4j is loaded.
-6. Start the backend:
+4. Start the backend:
    ```
    cd backend
    uvicorn app.main:app --reload --port 8035
    ```
-7. Start the frontend:
+5. Start the frontend:
    ```
    cd frontend
    npm install
@@ -93,18 +92,22 @@ loaders) that populates the database once from the GBIF backbone.
 
 ```
 pipeline/
-  download_all.py                Orchestrates the enrichment fetchers
-  fetchers/                      One fetcher per source (Wikipedia, EOL, FishBase,
-                                  POWO, AmphibiaWeb, Wikidata, Wikimedia, Xeno-canto)
-  backbone_extras.py             Extracts descriptions/vernaculars/images/refs/types
-  clean4neo4j.py                 Normalizes CSVs for LOAD CSV
-  loaders/                       Cypher loaders, one per source
-  repair/                        Graph integrity repair (see below)
-  notebooks/                     Node and relationship CSV generation
+  00_download_backbone.py        GBIF Backbone 2023-08-28 (dated URL, size check)
+  01_backbone.py                 Tree by taxonID with DuckDB, checked by invariants.py
+  02_wikidata_ids.py             Wikidata bridge item <-> GBIF ID (P846) and articles
+  03_enrich.py                   Matches every source to a node (match.py, gbif_extras.py)
+  04_export.py                   Collapses per node and writes neo4j-admin CSVs
+  05_check_graph.py              Repeats the tree invariants in Cypher
+  fetchers/                      One downloader per external source (Wikipedia,
+                                  Wikimedia, Wikidata, POWO, FishBase, Xeno-canto)
+  tests/                         Invariant and matching tests
+ops/                             build.sh, run.sh, compose.yml, import.sh, schema.cypher
 explore/                         Audit and reference queries
 ```
 
-Run every script from the repo root. Outputs in `biodiversity_data/`; nodes per rank in `taxonomy_nodes_by_rank/`.
+Outputs in `biodiversity_data/v2/`: `taxa.parquet`, `enriched/` (one parquet per source)
+and `import/` (gzipped CSVs). The full graph is ~7M nodes and ~7.8M relationships,
+a 4.1 GB store.
 
 ## Data model (summary)
 
@@ -112,9 +115,9 @@ Hierarchy on a single `HAS_CHILD` plane from the root node `Biota`, through 4
 `Domain` and 9 `Kingdom` nodes, down to each `Species`. Enrichment hangs off species:
 `FOUND_IN` (country), `HAS_DESCRIPTION`, `HAS_MEDIA`.
 
-**Key gotcha:** keys are not uniform. `family`, `genus`, and `species` use the GBIF
-`taxonID` as their key; `kingdom`, `phylum`, `class`, `order`, and `domain` use small
-in-house numbering. Any cross-reference with GBIF data must respect this.
+Every node is a `:Taxon` with its rank as a second label, keyed by the GBIF `taxonID`
+on all ranks. What GBIF doesn't publish gets a negative ID: Biota -1, Eukaryota -2,
+Prokaryota -3, Viruses -4, incertae sedis -5.
 
 Full detail on nodes, relationships, and per-kingdom colors is in the technical
 documentation.

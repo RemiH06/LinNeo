@@ -13,6 +13,7 @@ TAXA = OUT / "taxa.parquet"
 SYNONYMS = OUT / "synonyms.parquet"
 ENRICHED = OUT / "enriched"
 REJECTS = OUT / "rejects.parquet"
+IMPORT_DIR = OUT / "import"
 WIKIDATA_DIR = DATA / "wikidata"
 
 # Orden de la jerarquía: un padre siempre tiene nivel menor que su hijo.

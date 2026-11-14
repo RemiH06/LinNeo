@@ -5,7 +5,6 @@ Descarga nombres comunes en múltiples idiomas desde Wikidata.
 Descarga de: https://query.wikidata.org/sparql
 Guardado en: biodiversity_data/wikidata/wikidata_common_names.csv
 
-Estructura similar a download_biodiversity_data.py para consistencia.
 """
 
 import requests

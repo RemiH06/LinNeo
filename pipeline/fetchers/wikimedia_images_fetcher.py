@@ -273,7 +273,7 @@ class WikimediaImagesFetcher:
 
 
 def fetch_wikimedia_images(kingdom_filter: Optional[List[str]] = KINGDOM_FILTER):
-    """Funcion principal. Llamada por download_all.py"""
+    """Funcion principal."""
     logger.info(f"Inicio: {datetime.now()}")
 
     fetcher = WikimediaImagesFetcher()

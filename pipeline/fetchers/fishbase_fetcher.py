@@ -199,7 +199,7 @@ class FishBaseFetcher:
 
 
 def fetch_fishbase_data():
-    """Funcion principal. Llamada por download_all.py"""
+    """Funcion principal."""
     logger.info(f"Inicio: {datetime.now()}")
 
     fetcher = FishBaseFetcher()
