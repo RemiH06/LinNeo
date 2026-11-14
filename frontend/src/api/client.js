@@ -9,15 +9,15 @@ async function get(path) {
 }
 export const api = {
   stats: () => get('/stats'),
-  search: (q, limit = 25) => get(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  // API v2: los taxones se piden solo por taxonID; `rank` queda en las rutas del front.
+  search: (q, limit = 25, offset = 0) => get(`/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`),
   searchClades: (q, limitPerGroup = 100, mode = 'contains') => get(`/search/clades?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}&mode=${mode}`),
   searchCladesByRank: (rank, q, limitPerGroup = 100, mode = 'contains') => get(`/search/clades/${rank}?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}&mode=${mode}`),
-  searchDescription: (q, limit = 25) => get(`/search/description?q=${encodeURIComponent(q)}&limit=${limit}`),
   species: (key) => get(`/species/${key}`),
-  taxon: (rank, key) => get(`/taxon/${rank}/${key}`),
-  taxonGallery: (rank, key, limit = 250) => get(`/taxon/${rank}/${key}/gallery?limit=${limit}`),
-  taxonSounds: (rank, key, limit = 250) => get(`/taxon/${rank}/${key}/sounds?limit=${limit}`),
-  taxonInfographic: (rank, key) => get(`/taxon/${rank}/${key}/infographic`),
+  taxon: (key) => get(`/taxon/${key}`),
+  taxonGallery: (key, limit = 250) => get(`/taxon/${key}/gallery?limit=${limit}`),
+  taxonSounds: (key, limit = 250) => get(`/taxon/${key}/sounds?limit=${limit}`),
+  taxonInfographic: (key) => get(`/taxon/${key}/infographic`),
   filter: (params) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== '')
@@ -27,18 +27,14 @@ export const api = {
   // shui
   kingdoms: () => get('/kingdoms'),
   graph: () => get('/graph'),
-  graphFocus: (rank, key) => get(`/graph/${rank}/${key}`),
-  randomKingdoms: () => get('/random/kingdoms'),
+  graphFocus: (key) => get(`/graph/${key}`),
   randomPool: (kingdoms = [], n = 8) => {
     const qs = new URLSearchParams()
     kingdoms.forEach((k) => qs.append('kingdoms', k))
     qs.set('n', n)
     return get(`/random/pool?${qs.toString()}`)
   },
-  randomDescendants: (rank, key, n = 9) => get(`/random/${rank}/${key}?n=${n}`),
-  continents: () => get('/continents'),
-  countries: (continent) => get(`/continents/${encodeURIComponent(continent)}/countries`),
-  mapContinent: (continent) => get(`/map/continent/${encodeURIComponent(continent)}`),
+  randomDescendants: (key, n = 9) => get(`/random/${key}?n=${n}`),
   mapCountry: (code) => get(`/map/country/${encodeURIComponent(code)}`),
 }
 // Paleta y etiquetas de los tipos de presencia (establishment_means)

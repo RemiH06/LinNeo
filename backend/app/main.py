@@ -1,243 +1,223 @@
-"""
-LinNeo API -- FastAPI sobre el grafo Neo4j.
+"""LinNeo API: FastAPI de solo lectura sobre el grafo de Neo4j.
 
-Ejecutar:
     cd backend
-    pip install -r requirements.txt
     uvicorn app.main:app --reload --port 8035
 
-Docs interactivas: http://localhost:8035/docs
+Docs interactivas en http://localhost:8035/docs (cerradas con LINNEO_ENV=prod).
 """
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
+import os
+from contextlib import asynccontextmanager
+from typing import List, Literal
 
-from . import queries
-from .db import close_driver
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+
+from . import db, queries
+
+API_VERSION = "2.0.0"
+PROD = os.getenv("LINNEO_ENV") == "prod"
+# En prod el front y la API comparten origen; CORS solo hace falta en desarrollo.
+CORS_ORIGINS = [o for o in os.getenv("CORS_ORIGINS", "http://localhost:5135").split(",") if o]
+CACHE_MAX_AGE = 3600
+
+Rank = Literal["domain", "kingdom", "phylum", "class", "order", "family", "genus", "species"]
+Mode = Literal["contains", "starts"]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db.connect()
+    # La data solo cambia con un import y el formato con una versión de la API.
+    app.state.etag = f'"{queries.data_version()}-{API_VERSION}"'
+    yield
+    db.close()
+
 
 app = FastAPI(
     title="LinNeo API",
     description="Consulta de biodiversidad sobre el grafo LinNeo",
-    version="1.0.0",
-)
-
-# CORS: permitir que el frontend (otro origen) consuma la API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # en produccion, restringir al dominio del front
-    allow_methods=["*"],
-    allow_headers=["*"],
+    version=API_VERSION,
+    lifespan=lifespan,
+    docs_url=None if PROD else "/docs",
+    redoc_url=None,
+    openapi_url=None if PROD else "/openapi.json",
 )
 
 
-@app.on_event("shutdown")
-def shutdown():
-    close_driver()
+def _is_random(path):
+    return path.startswith("/random") or path.endswith("/infographic")
+
+
+@app.middleware("http")
+async def http_cache(request: Request, call_next):
+    """ETag por versión de datos: un If-None-Match vigente responde 304 sin tocar Neo4j.
+
+    Las rutas al azar no se guardan en caché.
+    """
+    if request.method != "GET":
+        return await call_next(request)
+    if _is_random(request.url.path):
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    etag = request.app.state.etag
+    headers = {"ETag": etag, "Cache-Control": f"public, max-age={CACHE_MAX_AGE}"}
+    sent = request.headers.get("if-none-match", "")
+    if etag in (tag.strip().removeprefix("W/") for tag in sent.split(",")):
+        return Response(status_code=304, headers=headers)
+    response = await call_next(request)
+    if response.status_code == 200:
+        response.headers.update(headers)
+    return response
+
+
+# Después del de caché para quedar por fuera: así también los 304 llevan CORS.
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["GET"])
+
+
+def _found(value, what):
+    if value is None:
+        raise HTTPException(status_code=404, detail=f"{what} no encontrado")
+    return value
 
 
 @app.get("/")
 def root():
-    return {"name": "LinNeo API", "status": "ok", "docs": "/docs"}
+    return {"name": "LinNeo API", "version": API_VERSION, "status": "ok"}
 
 
 @app.get("/stats")
-def get_stats():
-    """Estadisticas generales del grafo."""
+def stats():
+    """Totales del grafo."""
     return queries.stats()
 
 
+# ── Búsqueda ──
+
 @app.get("/search")
 def search(
-    q: str = Query(..., min_length=2, description="Termino de busqueda"),
+    q: str = Query(..., min_length=2, max_length=100, description="Nombre científico, sinónimo o común"),
+    offset: int = Query(0, ge=0, lt=queries.SEARCH_WINDOW),
     limit: int = Query(25, ge=1, le=100),
 ):
-    """Busca especies por nombre cientifico o comun."""
-    return {"query": q, "results": queries.search_by_name(q, limit)}
+    """Búsqueda de taxones de cualquier rango: exactos primero, luego los más conocidos."""
+    found = queries.search(q, offset, limit)
+    return {"query": q, "offset": offset, "limit": limit, **found}
 
 
 @app.get("/search/clades")
 def search_clades(
-    q: str = Query(..., min_length=1, description="Cadena a buscar en todos los rangos"),
+    q: str = Query(..., min_length=2, max_length=100),
     limit_per_group: int = Query(100, ge=1, le=200),
-    mode: str = Query("contains", description="contains o starts"),
+    mode: Mode = "contains",
 ):
-    """
-    Busca `q` en todos los rangos taxonomicos (domain..species), agrupado por
-    rango y reino. mode='contains' (default) o 'starts' (empieza con; para
-    species se evalua sobre el epiteto, 2da palabra del nombre).
-    """
-    mode = mode if mode in ("contains", "starts") else "contains"
+    """Subcadena del nombre en todos los rangos, agrupada por rango y reino."""
     return {"query": q, "groups": queries.search_clades(q, limit_per_group, mode)}
 
 
 @app.get("/search/clades/{rank}")
 def search_clades_by_rank(
-    rank: str,
-    q: str = Query(..., min_length=1, description="Cadena a buscar en este rango"),
+    rank: Rank,
+    q: str = Query(..., min_length=2, max_length=100),
     limit_per_group: int = Query(100, ge=1, le=200),
-    mode: str = Query("contains", description="contains o starts"),
+    mode: Mode = "contains",
 ):
-    """
-    Version per-rango de /search/clades: busca `q` solo en el rango indicado,
-    agrupado por reino. Permite que el frontend dispare 8 llamadas paralelas
-    (una por rango) y renderice cada grupo en cuanto su respuesta llega, en
-    vez de esperar a que el rango mas lento termine.
-    """
-    mode = mode if mode in ("contains", "starts") else "contains"
-    return {"query": q, "rank": rank, "groups": queries.search_clades_by_rank(q, rank, limit_per_group, mode)}
-
-
-@app.get("/search/description")
-def search_description(
-    q: str = Query(..., min_length=3, description="Texto a buscar en descripciones"),
-    limit: int = Query(25, ge=1, le=100),
-):
-    """Busca un termino dentro de las descripciones de las especies."""
-    return {"query": q, "results": queries.search_in_descriptions(q, limit)}
-
-
-@app.get("/species/{species_key}")
-def species_detail(species_key: int):
-    """Ficha completa de una especie."""
-    detail = queries.get_species_detail(species_key)
-    if detail is None:
-        raise HTTPException(status_code=404, detail="Especie no encontrada")
-    detail["lineage"] = queries.get_taxonomy_path(species_key)
-    detail["relatives"] = queries.get_relatives(species_key)
-    return detail
+    """Lo mismo en un solo rango, para que el front pinte cada rango en cuanto llega."""
+    return {"query": q, "rank": rank,
+            "groups": queries.search_clades_by_rank(q, rank, limit_per_group, mode)}
 
 
 @app.get("/filter")
 def filter_species(
-    kingdom: Optional[str] = None,
-    country: Optional[str] = None,
-    habit: Optional[str] = None,
+    country: str = Query(..., min_length=2, max_length=2, description="ISO 3166-1 alfa-2"),
+    kingdom: str | None = None,
+    habit: str | None = Query(None, max_length=50),
+    offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    """Filtra especies por reino, pais y/o habito."""
+    """Especies de un país, por reino y/o hábito, en orden de taxonID."""
     return {
-        "filters": {"kingdom": kingdom, "country": country, "habit": habit},
-        "results": queries.filter_species(kingdom, country, habit, limit),
+        "filters": {"country": country, "kingdom": kingdom, "habit": habit},
+        "offset": offset, "limit": limit,
+        "results": queries.filter_species(country, kingdom, habit, offset, limit),
     }
 
 
-@app.get("/taxon/{rank}/{key}")
-def taxon_node(rank: str, key: int):
-    """Vista de un nodo taxonomico no-especie: hijos directos + paises agregados."""
-    node = queries.get_taxon_node(rank, key)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
-    return node
+# ── Especie y taxón ──
+
+@app.get("/species/{key}")
+def species(key: int):
+    """Ficha completa de una especie, con linaje y parientes."""
+    return _found(queries.species_detail(key), "Especie")
 
 
-@app.get("/taxon/{rank}/{key}/gallery")
-def taxon_gallery(rank: str, key: int, limit: int = Query(250, ge=1, le=500)):
-    """
-    Especies con imagen descendientes de un taxon, sin importar la
-    profundidad. Usado por la vista de Galeria, que asi funciona en
-    cualquier rango (genus, family, order...) y no solo en genus.
-    """
-    gallery = queries.get_taxon_gallery(rank, key, limit)
-    if gallery is None:
-        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
-    return gallery
+@app.get("/taxon/{key}")
+def taxon(key: int, offset: int = Query(0, ge=0), limit: int = Query(500, ge=1, le=1000)):
+    """Taxón superior: hijos directos paginados, linaje y países de sus especies."""
+    return _found(queries.taxon_node(key, offset, limit), "Taxón")
 
 
-@app.get("/taxon/{rank}/{key}/sounds")
-def taxon_sound_tree(rank: str, key: int, limit: int = Query(250, ge=1, le=500)):
-    """
-    Arbol de navegacion (taxon enfocado como raiz + niveles intermedios
-    reales) hasta las especies con sonido, para la vista de Sonidos.
-    """
-    tree = queries.get_taxon_sound_tree(rank, key, limit)
-    if tree is None:
-        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
-    return tree
+@app.get("/taxon/{key}/gallery")
+def taxon_gallery(key: int, offset: int = Query(0, ge=0), limit: int = Query(250, ge=1, le=500)):
+    """Especies con imagen bajo el taxón, a cualquier profundidad."""
+    return _found(queries.taxon_gallery(key, offset, limit), "Taxón")
 
 
-@app.get("/taxon/{rank}/{key}/infographic")
-def taxon_infographic(rank: str, key: int, candidate_limit: int = Query(500, ge=1, le=2000)):
-    """
-    Datos agregados (stats, conservacion, reino, paises, especies
-    destacadas) para el poster/infografia de un taxon.
-    """
-    data = queries.get_taxon_infographic(rank, key, candidate_limit)
-    if data is None:
-        raise HTTPException(status_code=404, detail="Nodo taxonomico no encontrado")
-    return data
+@app.get("/taxon/{key}/sounds")
+def taxon_sounds(key: int, limit: int = Query(250, ge=1, le=500)):
+    """Árbol del taxón hasta sus especies con sonido."""
+    return _found(queries.taxon_sound_tree(key, limit), "Taxón")
 
 
-# ── SHUI: grafo principal, ejemplos por reino, geografia ──
+@app.get("/taxon/{key}/infographic")
+def taxon_infographic(key: int):
+    """Datos del póster de un taxón; las especies destacadas cambian en cada llamada."""
+    return _found(queries.taxon_infographic(key), "Taxón")
+
+
+# ── Grafo de exploración y ejemplos ──
 
 @app.get("/kingdoms")
 def kingdoms():
-    return queries.list_kingdoms()
+    return queries.kingdoms()
 
 
 @app.get("/graph")
 def graph():
-    """Grafo inicial: Biota -> dominios -> reinos."""
-    return queries.graph_default()
+    """Grafo inicial: Biota, dominios y reinos."""
+    return queries.graph_focus(-1)
 
 
-@app.get("/graph/{rank}/{key}")
-def graph_focus(rank: str, key: int):
-    """Grafo centrado en un nodo + 2 niveles de descendientes."""
-    g = queries.graph_focus(rank, key)
-    if g is None:
-        raise HTTPException(status_code=404, detail="Nodo no encontrado")
-    return g
-
-
-@app.get("/random/kingdoms")
-def random_kingdoms():
-    """Una especie aleatoria con descripcion por cada reino."""
-    return queries.random_by_kingdom(1)
+@app.get("/graph/{key}")
+def graph_focus(key: int):
+    """Grafo centrado en un taxón, con dos niveles de descendientes."""
+    return _found(queries.graph_focus(key), "Taxón")
 
 
 @app.get("/random/pool")
 def random_pool(
-    kingdoms: List[str] = Query(default=[], description="Reinos activos (pot); vacio = todos"),
+    kingdoms: List[str] = Query(default=[], description="Reinos activos; vacío = todos"),
     n: int = Query(8, ge=1, le=30),
 ):
-    """
-    'Pot' de reinos: n tiradas independientes, cada una elige un reino al
-    azar dentro de `kingdoms` (no garantiza 1 por reino). Usado por la barra
-    de ejemplos de Shui para respetar los reinos activos en los checkboxes.
-    """
-    return queries.random_from_kingdom_pool(kingdoms, n)
+    """n especies con descripción, cada una de un reino elegido al azar entre `kingdoms`."""
+    return queries.random_from_kingdoms(kingdoms, n)
 
 
-@app.get("/random/{rank}/{key}")
-def random_descendants(rank: str, key: int, n: int = Query(9, ge=1, le=20)):
-    """Especies aleatorias con descripcion descendientes de un nodo."""
-    return queries.random_descendants(rank, key, n)
+@app.get("/random/{key}")
+def random_descendants(key: int, n: int = Query(9, ge=1, le=20)):
+    """Especies con descripción al azar bajo un taxón, de ramas distintas."""
+    return queries.random_descendants(key, n)
 
 
-@app.get("/continents")
-def continents():
-    return queries.list_continents()
-
-
-@app.get("/continents/{continent}/countries")
-def continent_countries(continent: str):
-    return queries.countries_in_continent(continent)
-
-
-@app.get("/map/continent/{continent}")
-def map_continent(continent: str):
-    """Vista de un continente: sus paises, cada uno con su conteo de especies."""
-    node = queries.get_continent_node(continent)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Continente no encontrado")
-    return node
-
+# ── Geografía ──
 
 @app.get("/map/country/{code}")
-def map_country(code: str):
-    """Vista de un pais: especies presentes, con el mismo shape que /taxon."""
-    node = queries.get_country_node(code)
-    if node is None:
-        raise HTTPException(status_code=404, detail="Pais no encontrado")
-    return node
+def map_country(
+    code: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(500, ge=1, le=1000),
+):
+    """Especies presentes en un país, con el mismo formato que /taxon."""
+    return _found(queries.country_node(code, offset, limit), "País")

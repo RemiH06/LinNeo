@@ -138,7 +138,7 @@ export default function TaxonNode({ rank, nodeKey }) {
     setOnlyImages(false); setOnlyDescriptions(false); setOnlySounds(false); setOnlyCommonNames(false)
     setActiveLetter(null); setActiveCountry(null); setActiveContinent(null)
     timer.start()
-    api.taxon(rank, nodeKey)
+    api.taxon(nodeKey)
       .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }

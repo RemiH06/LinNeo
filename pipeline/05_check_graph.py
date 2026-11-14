@@ -35,6 +35,9 @@ def main():
             "MATCH (p:Phylum)-[:HAS_CHILD*]->(f:Family {name: 'Cepolidae'}) "
             "RETURN count(DISTINCT p.name) + count(DISTINCT f)", 4),
     }
+    # Los conteos precalculados de Biota cubren todas las especies (aggregates.py).
+    checks["speciesCount de Biota"] = ("MATCH (b:Biota) RETURN b.speciesCount",
+                                       expected["species"])
     for rank, n in expected.items():
         label = rank[0].upper() + rank[1:]
         checks[f"nodos {label}"] = (f"MATCH (t:{label}) RETURN count(t)", n)

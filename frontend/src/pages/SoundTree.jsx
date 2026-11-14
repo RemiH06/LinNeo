@@ -53,7 +53,7 @@ export default function SoundTree() {
     setLoading(true); setError(null); setData(null)
     setTabs([]); setVisibleChildren({})
     timer.start()
-    api.taxonSounds(rank, key, 250)
+    api.taxonSounds(key, 250)
       .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }

@@ -53,7 +53,7 @@ query.
 
 | Layer | Technology | Role | Port |
 |---|---|---|---|
-| Database | Neo4j (database `linneo`) | Taxonomic graph + enrichment | 7687 / 7474 |
+| Database | Neo4j Community (database `neo4j`) | Taxonomic graph + enrichment | 7687 / 7474 |
 | Backend | FastAPI (uvicorn) | Translates HTTP requests into Cypher | 8035 |
 | Frontend | React + Vite | UI, three themes, `/api` proxy → `localhost:8035` | 5135 |
 
@@ -76,10 +76,16 @@ loaders) that populates the database once from the GBIF backbone.
    bash ops/import.sh                       # import, constraints, fulltext
    ops/run.sh pipeline/05_check_graph.py    # validates the loaded graph
    ```
-4. Start the backend:
+4. Start the backend (`LINNEO_ENV=prod` closes `/docs`; `CORS_ORIGINS` lists the allowed origins):
    ```
+   uv pip install -r backend/requirements-dev.txt
    cd backend
    uvicorn app.main:app --reload --port 8035
+   ```
+   Endpoint tests run against a throwaway Neo4j on port 7688:
+   ```
+   (cd ops && docker compose --profile test up -d neo4j-test)
+   cd backend && python -m unittest discover -s tests
    ```
 5. Start the frontend:
    ```
@@ -97,6 +103,7 @@ pipeline/
   02_wikidata_ids.py             Wikidata bridge item <-> GBIF ID (P846) and articles
   03_enrich.py                   Matches every source to a node (match.py, gbif_extras.py)
   04_export.py                   Collapses per node and writes neo4j-admin CSVs
+  aggregates.py                  Per-taxon counts over descendant species (read by the API)
   05_check_graph.py              Repeats the tree invariants in Cypher
   fetchers/                      One downloader per external source (Wikipedia,
                                   Wikimedia, Wikidata, POWO, FishBase, Xeno-canto)

@@ -91,7 +91,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
   const typedSections = TYPE_ORDER.filter((t) => byType[t]?.length)
   const lineage = (data.lineage || []).slice()
     .sort((a, b) => RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank))
-  const title = data.scientific_name || data.canonical_name
+  const title = data.scientific_name || data.name
 
   // conservacion por pais (solo los que tienen codigo), para el detalle
   const consByCountry = distribution.filter((d) => d.conservation_code)
@@ -104,8 +104,8 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-.5px', fontStyle: 'italic', lineHeight: 1.3 }}>
             {title}
           </div>
-          {data.canonical_name && data.canonical_name !== title && (
-            <div className="muted" style={{ marginTop: 2 }}>{data.canonical_name}</div>
+          {data.name && data.name !== title && (
+            <div className="muted" style={{ marginTop: 2 }}>{data.name}</div>
           )}
 
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', margin: '10px 0' }}>
@@ -144,8 +144,8 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           <TaxonomyGraph
             lineage={lineage}
             relatives={data.relatives}
-            currentName={data.canonical_name || title}
-            currentKey={data.species_key}
+            currentName={data.name || title}
+            currentKey={data.key}
             kingdom={data.kingdom}
           />
         </div>
@@ -257,7 +257,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
             <div className="media-grid-side">
               {images.map((m, i) => (
                 <div key={i} className="media-thumb-lg" onClick={() => setLightbox({ items: images, index: i })} title="Abrir galeria">
-                  <img src={m.url} alt={data.canonical_name} loading="lazy" />
+                  <img src={m.url} alt={data.name} loading="lazy" />
                 </div>
               ))}
             </div>
@@ -270,7 +270,7 @@ export default function SpeciesDetail({ speciesKey, onOpenMedia }) {
           items={lightbox.items}
           index={lightbox.index}
           onClose={() => setLightbox(null)}
-          speciesName={data.canonical_name || data.scientific_name}
+          speciesName={data.name || data.scientific_name}
         />
       )}
     </div>

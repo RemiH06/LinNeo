@@ -93,7 +93,7 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
     // color del kingdom enfocado, sin importar cuanto se navegue dentro de el.
     const focusedKingdom = data.kingdom || null
     const colorOf = (n) => {
-      if (n.rank === 'root') return dark ? '#A0E8F8' : '#1878A0' // Biota neutro
+      if (n.rank === 'biota') return dark ? '#A0E8F8' : '#1878A0' // Biota neutro
       if (n.rank === 'domain' || n.rank === 'kingdom') return nodeColor(n.kingdom || n.name, 'kingdom', dark)
       return nodeColor(focusedKingdom || n.kingdom, n.rank, dark)
     }
@@ -163,7 +163,7 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
         const r = radiusOf(n)
         drawNode(n, r)
         // etiquetas: centro, reinos/dominios y filos; el resto en zoom alto
-        const showLabel = n.rank === 'root' || n.rank === 'domain' || n.rank === 'kingdom' || n.id === data.center || view.k > 1.4 || n.rank === 'phylum'
+        const showLabel = n.rank === 'biota' || n.rank === 'domain' || n.rank === 'kingdom' || n.id === data.center || view.k > 1.4 || n.rank === 'phylum'
         if (showLabel) {
           ctx.font = `${n.id === data.center ? 'bold ' : ''}${11 / view.k}px Recursive, monospace`
           ctx.fillStyle = textColor; ctx.textAlign = 'left'
@@ -200,8 +200,8 @@ export default function ShuiGraph({ data, onFocus, onOpenSpecies }) {
         if (!moved) {
           const n = dragging
           if (n.rank === 'species' && n.key) onOpenRef.current?.(n.key)
-          else if (n.rank !== 'root' && n.key) onFocusRef.current?.(n)
-          else if (n.rank === 'root') onFocusRef.current?.(null) // Biota -> reset
+          else if (n.rank !== 'biota' && n.key) onFocusRef.current?.(n)
+          else if (n.rank === 'biota') onFocusRef.current?.(null) // Biota -> reset
         }
         dragging.fx = (dragging.id === data.center) ? dragging.fx : null
         dragging.fy = (dragging.id === data.center) ? dragging.fy : null

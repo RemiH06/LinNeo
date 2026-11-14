@@ -22,6 +22,20 @@ services:
       - ../biodiversity_data/v2/import:/import:ro
       - ./schema.cypher:/schema.cypher:ro
 
+  # Grafo desechable para los tests del backend: docker compose --profile test up -d
+  neo4j-test:
+    image: neo4j:5.26.33-community
+    profiles: [test]
+    restart: "no"
+    environment:
+      NEO4J_AUTH: none
+      NEO4J_server_memory_heap_max__size: 512M
+      NEO4J_server_memory_pagecache_size: 128M
+    ports:
+      - "127.0.0.1:7688:7687"
+    tmpfs:
+      - /data
+
 volumes:
   data:
   logs:

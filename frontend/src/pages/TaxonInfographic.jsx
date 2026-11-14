@@ -39,7 +39,7 @@ export default function TaxonInfographic() {
     let alive = true
     setLoading(true); setError(null); setData(null)
     timer.start()
-    api.taxonInfographic(rank, key)
+    api.taxonInfographic(key)
       .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }

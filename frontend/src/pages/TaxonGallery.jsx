@@ -60,7 +60,7 @@ export default function TaxonGallery() {
     let alive = true
     setLoading(true); setError(null); setData(null)
     timer.start()
-    api.taxonGallery(rank, key, 250)
+    api.taxonGallery(key, 250)
       .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
       .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
     return () => { alive = false }

@@ -133,7 +133,7 @@ export default function Shui() {
     const keepKingdomNames = activeKingdoms
     // nodos: biota + TODOS los dominios (siempre visibles) + reinos activos
     const nodes = full.nodes.filter((n) => {
-      if (n.rank === 'root' || n.rank === 'domain') return true
+      if (n.rank === 'biota' || n.rank === 'domain') return true
       return keepKingdomNames.has(n.kingdom)
     })
     const ids = new Set(nodes.map((n) => n.id))
@@ -171,7 +171,7 @@ export default function Shui() {
     if (focusLoading) return // evita carreras si se hace click varias veces mientras carga
     setFocusLoading(true)
     focusTimer.start()
-    api.graphFocus(node.rank, node.key).then((g) => {
+    api.graphFocus(node.key).then((g) => {
       if (focusOpRef.current !== opId) return // una operacion mas reciente (otro click o un reset) ya tomo el control
       // Fallback: si el backend no pudo determinar el reino del nuevo nodo
       // (rangos como Phylum/Class/Order/Family no tienen su propia propiedad
@@ -186,7 +186,7 @@ export default function Shui() {
       setFocusNode(node)
       setFocusLoading(false); focusTimer.stop()
       setExLoading(true); setExError(false)
-      api.randomDescendants(node.rank, node.key, 9)
+      api.randomDescendants(node.key, 9)
         .then((rows) => { if (focusOpRef.current === opId) { setExamples(rows || []); setExLoading(false) } })
         .catch(() => { if (focusOpRef.current === opId) { setExError(true); setExLoading(false) } })
     }).catch(() => {
@@ -227,7 +227,7 @@ export default function Shui() {
     setQ(value)
     setActiveIdx(-1)
     clearTimeout(searchTimer.current)
-    if (!value.trim()) { setResults([]); setSearchError(false); return }
+    if (value.trim().length < 2) { setResults([]); setSearchError(false); return }
     searchTimer.current = setTimeout(() => {
       setSearchLoading(true); setSearchError(false)
       api.searchClades(value.trim(), 8)
@@ -313,7 +313,7 @@ export default function Shui() {
       searchRef,
       resetAll,
       reloadExamples: () => focusNode
-        ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples)
+        ? api.randomDescendants(focusNode.key, 9).then(setExamples)
         : loadKingdomExamples(),
       openDrawer,
       navigateToList,
@@ -478,10 +478,10 @@ export default function Shui() {
                 <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
               )}
               {!exLoading && !exError && examples.map((ex, i) => (
-                <a key={ex.species_key || i} className="sh-kbox"
+                <a key={ex.key || i} className="sh-kbox"
                   style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
-                  href={`/species/${ex.species_key}`}
-                  onClick={(e) => { e.preventDefault(); navigate(`/species/${ex.species_key}`) }}
+                  href={`/species/${ex.key}`}
+                  onClick={(e) => { e.preventDefault(); navigate(`/species/${ex.key}`) }}
                   title={ex.name}>
                   {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
                   <span className="label">{ex.name}</span>
@@ -489,7 +489,7 @@ export default function Shui() {
               ))}
             </div>
             <div className="sh-kbar-actions">
-              <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.rank, focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
+              <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
             </div>
           </div>
         </div>

@@ -6,10 +6,14 @@ así se puede medir el store con y sin cada fuente eligiendo qué archivos impor
 Cuando la fila de un sinónimo y la del propio taxón caen en el mismo nodo,
 gana la del propio taxón (source_key = taxonID).
 
+Los taxones llevan conteos precalculados de sus especies descendientes
+(ver aggregates.py), así que los nodos se escriben al final.
+
     python pipeline/04_export.py
 """
 import duckdb
 
+import aggregates
 import gbif_extras as gbif
 from config import ENRICHED, IMPORT_DIR, REPO, TAXA, SYNONYMS
 
@@ -61,6 +65,7 @@ def taxa(con):
         )
         GROUP BY taxonID
     """)
+    con.execute("INSERT INTO content SELECT taxonID, 'common' FROM common")
     con.execute(f"""
         CREATE TEMP TABLE conservation AS
         SELECT c.taxonID, c.conservation_overall, c.conservation_overall_code
@@ -81,19 +86,33 @@ def taxa(con):
         WHERE habit <> ''
         QUALIFY row_number() OVER (PARTITION BY taxonID ORDER BY {OWN} DESC, habit) = 1
     """)
+    aggregates.build(con, f"read_parquet('{TAXA.as_posix()}')", "content",
+                     "(SELECT taxonID, country_key FROM distribution)",
+                     "(SELECT taxonID, conservation_overall_code AS code FROM conservation)")
     copy(con, f"""
         SELECT t.taxonID AS ":ID(Taxon)", t.taxonID AS "taxonID:long", t.name,
                t.scientificName AS scientific_name, t.authorship, t.rank, t.status, t.kingdom,
                {clean_list('n.synonyms')} AS "synonyms:string[]",
                {clean_list('c.names')} AS "commonNames:string[]",
                array_to_string(c.languages, chr(31)) AS "commonNamesLanguages:string[]",
+               lower(t.name) AS nameLower,
                k.conservation_overall, k.conservation_overall_code, h.habit,
+               coalesce(a.speciesCount, 0) AS "speciesCount:long",
+               coalesce(a.withImage, 0) AS "withImage:long",
+               coalesce(a.withSound, 0) AS "withSound:long",
+               coalesce(a.withText, 0) AS "withText:long",
+               coalesce(a.withCommonName, 0) AS "withCommonName:long",
+               coalesce(a.withContent, 0) AS "withContent:long",
+               array_to_string(a.countries, chr(31)) AS "countries:string[]",
+               array_to_string(a.iucnCodes, chr(31)) AS "iucnCodes:string[]",
+               array_to_string(a.iucnCounts, chr(31)) AS "iucnCounts:long[]",
                'Taxon' || chr(31) || upper(t.rank[1]) || t.rank[2:] AS ":LABEL"
         FROM read_parquet('{TAXA.as_posix()}') t
         LEFT JOIN names n USING (taxonID)
         LEFT JOIN common c USING (taxonID)
         LEFT JOIN conservation k USING (taxonID)
         LEFT JOIN habit h USING (taxonID)
+        LEFT JOIN agg a USING (taxonID)
     """, "taxa")
     copy(con, f"""
         SELECT parentID AS ":START_ID(Taxon)", taxonID AS ":END_ID(Taxon)", 'HAS_CHILD' AS ":TYPE"
@@ -128,6 +147,8 @@ def texts(con):
                 QUALIFY row_number() OVER (PARTITION BY taxonID, text ORDER BY type) = 1
             )
         """)
+        con.execute("""INSERT INTO content SELECT DISTINCT taxonID, 'text' FROM d
+                       WHERE type NOT IN ('reference', 'type_specimen')""")
         copy(con, """SELECT id AS ":ID(Description)", text, type, lang, source_name, source_url,
                      'Description' AS ":LABEL" FROM d""", f"description_{name}")
         copy(con, """SELECT taxonID AS ":START_ID(Taxon)", id AS ":END_ID(Description)",
@@ -152,6 +173,7 @@ def media(con):
                 QUALIFY row_number() OVER (PARTITION BY taxonID, url ORDER BY source_name) = 1
             )
         """)
+        con.execute("INSERT INTO content SELECT DISTINCT taxonID, media_type FROM m")
         copy(con, """SELECT id AS ":ID(Media)", url, media_type, title, creator, license,
                      source_name, source_url, 'Media' AS ":LABEL" FROM m""", f"media_{name}")
         copy(con, """SELECT taxonID AS ":START_ID(Taxon)", id AS ":END_ID(Media)",
@@ -195,10 +217,12 @@ def main():
         old.unlink()
     con = duckdb.connect()
     con.execute(f"SET temp_directory = '{(IMPORT_DIR / '.tmp').as_posix()}'")
-    taxa(con)
+    # Qué taxones tienen cada tipo de contenido (image, sound, text, common).
+    con.execute("CREATE TEMP TABLE content(taxonID BIGINT, kind VARCHAR)")
     texts(con)
     media(con)
     geography(con)
+    taxa(con)
     print(f"Escrito en {IMPORT_DIR}")
 
 
