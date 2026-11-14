@@ -9,31 +9,33 @@ import sys
 
 import duckdb
 
+import gbif_extras as gbif
 from config import DATA, ENRICHED, OUT, REJECTS, TAXA, WIKIDATA_DIR
 from match import load_index, match_taxon
+
+
+def csv(path):
+    return (f"read_csv('{(DATA / path).as_posix()}', header=true, all_varchar=true, delim=',', "
+            "quote='\"', escape='\"', max_line_size=30000000)")
+
 
 # route: wiki_url (título en source_url), wiki_name (título = nombre de la llave),
 # wikidata (item), name (nombre con contexto de reino), id (la llave ya es de GBIF).
 SOURCES = [
-    ("wikipedia", "descriptions/wikipedia_descriptions.csv", "wiki_url", None),
-    ("wikimedia", "images/wikimedia_images.csv", "wiki_name", None),
-    ("wikidata_names", "wikidata/wikidata_common_names.csv", "wikidata", None),
-    ("powo", "powo/powo_plants.csv", "name", "Plantae"),
-    ("fishbase", "fishbase/fishbase_fish.csv", "name", "Animalia"),
-    ("xeno_canto", "xeno_canto/xeno_canto_sounds.csv", "name", "Animalia"),
-    ("gbif_descriptions", "backbone_csv/backbone_descriptions.csv", "id", None),
-    ("gbif_images", "backbone_csv/backbone_images.csv", "id", None),
-    ("gbif_references", "backbone_csv/backbone_references.csv", "id", None),
-    ("gbif_types", "backbone_csv/backbone_types.csv", "id", None),
-    ("gbif_vernacular_es", "backbone_csv/backbone_vernacular_es.csv", "id", None),
-    ("conservation", "species_conservation.csv", "id", None),
-    ("distribution", "species_country_rels.csv", "id", None),
+    ("wikipedia", csv("descriptions/wikipedia_descriptions.csv"), "wiki_url", None),
+    ("wikimedia", csv("images/wikimedia_images.csv"), "wiki_name", None),
+    ("wikidata_names", csv("wikidata/wikidata_common_names.csv"), "wikidata", None),
+    ("powo", csv("powo/powo_plants.csv"), "name", "Plantae"),
+    ("fishbase", csv("fishbase/fishbase_fish.csv"), "name", "Animalia"),
+    ("xeno_canto", csv("xeno_canto/xeno_canto_sounds.csv"), "name", "Animalia"),
+    ("gbif_descriptions", gbif.DESCRIPTIONS, "id", None),
+    ("gbif_images", gbif.IMAGES, "id", None),
+    ("gbif_references", gbif.REFERENCES, "id", None),
+    ("gbif_types", gbif.TYPES, "id", None),
+    ("gbif_vernacular_es", gbif.VERNACULAR_ES, "id", None),
+    ("conservation", gbif.CONSERVATION, "id", None),
+    ("distribution", gbif.DISTRIBUTION, "id", None),
 ]
-
-
-def read_source(path):
-    return (f"read_csv('{(DATA / path).as_posix()}', header=true, all_varchar=true, delim=',', "
-            "quote='\"', escape='\"', max_line_size=30000000)")
 
 
 def load_wikidata(con):
@@ -95,11 +97,14 @@ def main():
     con.execute(f"SET temp_directory = '{(OUT / '.tmp').as_posix()}'")
     load_index(con)
     load_wikidata(con)
+    gbif.register(con)
     con.execute("""CREATE TEMP TABLE rejects(source VARCHAR, qkey VARCHAR, name VARCHAR,
                    reason VARCHAR)""")
 
-    for name, path, route, kingdom in SOURCES:
-        source = read_source(path)
+    for name, relation, route, kingdom in SOURCES:
+        # Se materializa una vez: se lee dos veces (llaves y salida) y limpiar texto cuesta.
+        con.execute(f"CREATE OR REPLACE TEMP TABLE source AS SELECT * FROM {relation}")
+        source = "source"
         build_queries(con, source, route, kingdom)
         match_taxon(con, "q")
         con.execute(f"INSERT INTO rejects SELECT '{name}', qkey, name, reason FROM unmatched")
@@ -111,6 +116,7 @@ def main():
         methods = con.execute("SELECT method, count(*) FROM matched GROUP BY 1 ORDER BY 2 DESC").fetchall()
         reasons = con.execute("SELECT reason, count(*) FROM unmatched GROUP BY 1 ORDER BY 2 DESC").fetchall()
         print(f"{name}: casados {dict(methods)}; descartados {dict(reasons)}", flush=True)
+        con.execute("DROP TABLE source")
 
     con.execute(f"COPY rejects TO '{REJECTS.as_posix()}' (FORMAT parquet, COMPRESSION zstd)")
     strays = con.execute(f"""

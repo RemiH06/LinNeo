@@ -9,9 +9,11 @@ respuesta se valida antes de publicarla.
 
     python pipeline/02_wikidata_ids.py
 """
+import http.client
 import json
 import shutil
 import sys
+import time
 import urllib.parse
 import urllib.request
 
@@ -32,6 +34,7 @@ QUERIES = {
     "gbif_es.tsv": SITELINK.format(lang="es"),
 }
 COUNT = "SELECT (COUNT(*) AS ?n) WHERE { ?item wdt:P846 ?gbif }"
+ATTEMPTS = 4
 
 
 def post(query, accept):
@@ -52,7 +55,7 @@ def download(name, query):
         next(lines)
         for line in lines:
             if line.count("\t") != columns - 1:
-                sys.exit(f"{name} truncado en la fila {rows}: {line.strip()[:80]}")
+                raise ValueError(f"{name} truncado en la fila {rows}: {line.strip()[:80]}")
             rows += 1
     return tmp, rows
 
@@ -64,10 +67,19 @@ def main():
 
     downloads = {}
     for name, query in QUERIES.items():
-        downloads[name], rows = download(name, query)
-        print(f"{name}: {rows:,} filas")
-        if name == "gbif_ids.tsv" and rows != expected:
-            sys.exit(f"{name}: esperaba {expected:,} filas, llegaron {rows:,}")
+        # El servidor a veces corta la respuesta a la mitad; se reintenta completa.
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                downloads[name], rows = download(name, query)
+                if name == "gbif_ids.tsv" and rows != expected:
+                    raise ValueError(f"{name}: esperaba {expected:,} filas, llegaron {rows:,}")
+                break
+            except (ValueError, OSError, http.client.HTTPException) as error:
+                print(f"Intento {attempt}/{ATTEMPTS}: {error}", flush=True)
+                if attempt == ATTEMPTS:
+                    sys.exit(f"{name}: sin descarga completa tras {ATTEMPTS} intentos")
+                time.sleep(30 * attempt)
+        print(f"{name}: {rows:,} filas", flush=True)
 
     # Se publican juntos: nunca queda un puente mezclado de dos descargas.
     for name, tmp in downloads.items():

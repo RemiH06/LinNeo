@@ -4,6 +4,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 DATA = REPO / "biodiversity_data"
 BACKBONE = DATA / "backbone_extract"
+BACKBONE_URL = "https://hosted-datasets.gbif.org/datasets/backbone/2023-08-28/backbone.zip"
 TAXON_TSV = BACKBONE / "Taxon.tsv"
 
 # Salidas de v2. Lo viejo de biodiversity_data/ se borra cuando v2 quede validada.
