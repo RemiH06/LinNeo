@@ -7,7 +7,7 @@ import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import SoundPlayerBox from '../components/SoundPlayerBox'
 import { layoutTree } from '../theme/soundTreeLayout'
 import '../theme/bookworm.css'
@@ -196,10 +196,7 @@ export default function SoundTree() {
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
       <div className="bw-page bw-page-wide">
-        <div className="bw-topbar">
-          <LinNeoLogo />
-          <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
-        </div>
+        <SiteHeader />
 
         {loading && (
           <div style={{ marginTop: 20 }}>

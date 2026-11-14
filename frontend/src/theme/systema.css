@@ -97,6 +97,36 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
+/* ── Controles de texto: sin caja, como una nota al margen ── */
+.ctl {
+  font: 400 var(--fs-small)/1.2 var(--serif); color: var(--ink2);
+  background: none; border: 0; padding: 6px 2px; min-height: 32px; cursor: pointer;
+  text-decoration: underline transparent; text-underline-offset: .2em;
+  transition: color var(--t-fast) var(--ease-out), text-decoration-color var(--t-fast) var(--ease-out);
+}
+.ctl:hover { color: var(--accent); text-decoration-color: currentColor; }
+.ctl:disabled { color: var(--ink2); opacity: .55; cursor: not-allowed; text-decoration-color: transparent; }
+.ctl-arrow { font-size: 1.5em; line-height: 0; margin-right: .2em; position: relative; top: .04em; }
+
+/* ── Cabeza de página: nombre, volver, ranura y modo sobre un filete doble ── */
+.site-head {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 28px;
+  padding-bottom: 10px; margin-bottom: 32px; border-bottom: 3px double var(--ink);
+}
+.site-head-start { display: flex; align-items: baseline; gap: 20px; flex-shrink: 0; }
+.site-head-slot { flex: 1; min-width: 0; }
+.site-head .theme-toggle { margin-left: auto; flex-shrink: 0; }
+.site-head .linneo-logo {
+  font: 400 30px/1 var(--display); letter-spacing: 0; color: var(--ink);
+  text-decoration: none; transition: color var(--t-fast) var(--ease-out);
+}
+.site-head .linneo-logo:hover { color: var(--accent); opacity: 1; }
+@media (max-width: 640px) {
+  .site-head { margin-bottom: 24px; }
+  .site-head .linneo-logo { font-size: 26px; }
+  .site-head-slot { order: 3; flex-basis: 100%; }
+}
+
 /* ============================================================
    PUENTE TEMPORAL (S4 → S5)
    Las variables de elixir, bookworm y shui apuntan a las nuevas para que

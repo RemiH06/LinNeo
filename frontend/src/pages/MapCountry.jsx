@@ -9,7 +9,7 @@ import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { isoToName } from '../components/DistributionMap'
 import { ContentFlags } from './TaxonNode'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import '../theme/bookworm.css'
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
@@ -80,10 +80,7 @@ export default function MapCountry() {
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(activeKingdom, dark)}>
       <div className="bw-page">
-        <div className="bw-topbar">
-          <LinNeoLogo />
-          <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
-        </div>
+        <SiteHeader />
 
         {loading && (
           <div style={{ marginTop: 20 }}>

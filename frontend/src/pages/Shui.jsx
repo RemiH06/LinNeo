@@ -5,8 +5,7 @@ import ShuiGraph from '../components/ShuiGraph'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { kingdomInk } from '../theme/kingdomColor'
-import ThemeToggle from '../components/ThemeToggle'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -334,8 +333,7 @@ export default function Shui() {
 
       <div className="sh-page">
         <div className="sh-top">
-          <div className="sh-topbar">
-            <LinNeoLogo className="sh-title" />
+          <SiteHeader back={false}>
             <div className="sh-searchbar" ref={resultsWrapRef}>
               <input ref={searchRef} className="sh-input" value={q}
                 onChange={(e) => onSearch(e.target.value)}
@@ -364,9 +362,8 @@ export default function Shui() {
                 </div>
               )}
             </div>
-            <button className="sh-kbtn" onClick={resetAll}>Reiniciar</button>
-            <ThemeToggle />
-          </div>
+            <button type="button" className="ctl" onClick={resetAll}>Reiniciar</button>
+          </SiteHeader>
         </div>
 
         {/* Cuerpo: barra izquierda + grafo + barra derecha */}

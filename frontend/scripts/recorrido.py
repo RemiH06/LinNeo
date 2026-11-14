@@ -13,6 +13,7 @@ OUT = Path(sys.argv[1] if len(sys.argv) > 1 else "capturas")
 MODO = sys.argv[2] if len(sys.argv) > 2 else "light"
 SOLO = sys.argv[3].split(",") if len(sys.argv) > 3 else None
 OUT.mkdir(exist_ok=True)
+sys.stdout.reconfigure(encoding="utf-8")  # la consola de Windows es cp1252
 
 def api(path):
     with urllib.request.urlopen(f"http://127.0.0.1:8035{path}") as r:

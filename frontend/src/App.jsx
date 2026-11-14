@@ -1,8 +1,7 @@
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { ThemeProvider } from './theme/ThemeContext'
 import { KingdomProvider } from './theme/KingdomContext'
-import ThemeToggle from './components/ThemeToggle'
-import LinNeoLogo from './components/LinNeoLogo'
+import SiteHeader from './components/SiteHeader'
 import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
 import Shui from './pages/Shui'
@@ -16,20 +15,13 @@ import ErrorBoundary from './components/ErrorBoundary'
 
 function SpeciesPage() {
   const { key } = useParams()
-  const navigate = useNavigate()
   // onOpenMedia: por ahora navega/loguea. Aqui conectaremos la transicion a bookworm.
   const onOpenMedia = (payload) => {
     console.log('Abrir media (futuro: transicion a bookworm)', payload)
   }
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <LinNeoLogo />
-          <button className="btn" onClick={() => navigate('/')}>{'\u2039'} volver</button>
-        </div>
-        <ThemeToggle />
-      </div>
+      <SiteHeader />
       <SpeciesDetail speciesKey={key} onOpenMedia={onOpenMedia} />
     </div>
   )

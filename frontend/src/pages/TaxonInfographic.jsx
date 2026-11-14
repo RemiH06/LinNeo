@@ -7,7 +7,7 @@ import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import MiniWorldMap from '../components/MiniWorldMap'
 import '../theme/bookworm.css'
 
@@ -73,10 +73,7 @@ export default function TaxonInfographic() {
   return (
     <div className="bookworm-scope ti-poster-scope" style={kingdomStyleVars(data.kingdom, dark)}>
       <div className="bw-page ti-poster-page">
-        <div className="bw-topbar">
-          <LinNeoLogo />
-          <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
-        </div>
+        <SiteHeader />
 
         <div className="ti-poster">
           {/* Encabezado */}

@@ -8,7 +8,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { ISO_CONTINENT, isoToName } from '../components/DistributionMap'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import '../theme/bookworm.css'
 
 /*
@@ -144,14 +144,7 @@ export default function MapExplorer() {
   return (
     <div className="bookworm-scope">
       <div className="bw-page">
-        <div className="bw-topbar">
-          <LinNeoLogo />
-          {continent ? (
-            <button className="bw-btn" onClick={() => navigate('/map')}>{'\u2039'} mapa mundial</button>
-          ) : (
-            <button className="bw-btn" onClick={() => navigate('/')}>{'\u2039'} volver a Shui</button>
-          )}
-        </div>
+        <SiteHeader back={continent ? { to: '/map', label: 'Mapa mundial' } : { to: '/', label: 'Inicio' }} />
 
         <div className="bw-header">
           <div className="bw-header-title">

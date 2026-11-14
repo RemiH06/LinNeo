@@ -8,7 +8,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
-import LinNeoLogo from '../components/LinNeoLogo'
+import SiteHeader from '../components/SiteHeader'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -202,10 +202,7 @@ export default function TaxonNode({ rank, nodeKey }) {
   return (
     <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
       <div className="bw-page">
-        <div className="bw-topbar">
-          <LinNeoLogo />
-          <button className="bw-btn" onClick={() => navigate(-1)}>{'\u2039'} volver</button>
-        </div>
+        <SiteHeader />
 
         {loading && (
           <div style={{ marginTop: 20 }}>
