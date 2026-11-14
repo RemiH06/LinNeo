@@ -33,6 +33,18 @@ FIRST_IMAGE = ("head(COLLECT { MATCH (%(v)s)-[:HAS_MEDIA]->(m:Media) WHERE m.med
                "RETURN m.url LIMIT 1 })")
 
 
+LANG_ORDER = {"es": 0, "en": 1}  # nombre común preferido: español, luego inglés
+
+
+def _by_language(names, langs):
+    """Nombres comunes con los de español primero y luego los de inglés; el resto, en su orden."""
+    if not names:
+        return names
+    langs = langs or [None] * len(names)
+    pairs = sorted(zip(names, langs), key=lambda p: LANG_ORDER.get(p[1], len(LANG_ORDER)))
+    return [n for n, _ in pairs]
+
+
 def _f(template, v):
     return template % {"v": v}
 
@@ -228,6 +240,7 @@ def _taxon(key):
         RETURN n.taxonID AS key, n.name AS name, n.rank AS rank, n.kingdom AS kingdom,
                n.speciesCount AS species_count, n.withImage AS with_image,
                n.withSound AS with_sound, n.withText AS with_text,
+               n.withCommonName AS with_common_name,
                coalesce(n.countries, []) AS countries,
                coalesce(n.iucnCodes, []) AS iucn_codes, coalesce(n.iucnCounts, []) AS iucn_counts,
                COUNT { (n)-[:HAS_CHILD]->() } AS children_total
@@ -250,7 +263,7 @@ def taxon_node(key, offset=0, limit=500):
                    .name, key: c.taxonID, .rank, conservation: c.conservation_overall_code,
                    images: COLLECT {{ MATCH (c)-[:HAS_MEDIA]->(m:Media) WHERE m.media_type = 'image'
                                      RETURN m.url LIMIT 5 }},
-                   common_names: c.commonNames,
+                   common_names: c.commonNames, langs: c.commonNamesLanguages,
                    countries: COLLECT {{ MATCH (c)-[:FOUND_IN]->(co) RETURN co.key }},
                    flags: {_f(SPECIES_FLAGS, 'c')}
                }} ELSE c {{ .name, key: c.taxonID, .rank, flags: {_f(TAXON_FLAGS, 'c')} }}
@@ -261,6 +274,7 @@ def taxon_node(key, offset=0, limit=500):
         if "images" in c:
             c["image"] = c["images"][0] if c["images"] else None
             c["flags"]["countries"] = len(c["countries"])
+            c["common_names"] = _by_language(c["common_names"], c.pop("langs"))
     ranks = _run("""
         MATCH (:Taxon {taxonID: $key})-[:HAS_CHILD]->(c)
         RETURN c.rank AS rank, count(*) AS n
@@ -276,6 +290,10 @@ def taxon_node(key, offset=0, limit=500):
         "lineage": lineage(key),
         "countries": node["countries"],
         "species_count": node["species_count"],
+        # Mismas llaves que TAXON_FLAGS de un hijo: especies descendientes con cada contenido.
+        "flags": {"species": node["species_count"], "images": node["with_image"],
+                  "sounds": node["with_sound"], "descriptions": node["with_text"],
+                  "common_names": node["with_common_name"]},
     }
 
 

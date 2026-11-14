@@ -5,7 +5,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { kingdomStyleVars } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
-import { ContentFlags } from './TaxonNode'
+import ContentFlags from '../components/ContentFlags'
 import SiteHeader from '../components/SiteHeader'
 import '../theme/bookworm.css'
 

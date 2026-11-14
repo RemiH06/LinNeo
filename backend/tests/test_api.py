@@ -191,11 +191,16 @@ class ApiTest(unittest.TestCase):
         self.assertEqual((t["child_rank"], t["species_count"], t["children_total"]),
                          ("species", 2, 2))
         self.assertEqual(t["countries"], ["BR", "KE", "MX"])
+        a = aggregates(2435194)  # flags del nodo: los agregados de todo el subárbol, no de una página
+        self.assertEqual(t["flags"], {"species": a["speciesCount"], "images": a["withImage"],
+                                      "sounds": a["withSound"], "descriptions": a["withText"],
+                                      "common_names": a["withCommonName"]})
         onca = next(c for c in t["children"] if c["key"] == ONCA)
         self.assertEqual(onca["flags"], {"images": 2, "sounds": 1, "descriptions": 1,
                                          "etymology": 0, "countries": 2})
         self.assertIn(onca["image"], onca["images"])
         self.assertEqual(len(onca["images"]), 2)
+        self.assertEqual(onca["common_names"], ["yaguar", "jaguar", "onça-pintada"])  # es, en, resto
         self.assertEqual(t["lineage"][-1]["key"], 2435194)
         self.get(f"/taxon/{ONCA}", status=404)
 

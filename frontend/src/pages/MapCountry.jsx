@@ -8,7 +8,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { isoToName } from '../components/DistributionMap'
-import { ContentFlags } from './TaxonNode'
+import ContentFlags from '../components/ContentFlags'
 import SiteHeader from '../components/SiteHeader'
 import '../theme/bookworm.css'
 

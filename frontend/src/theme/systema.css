@@ -97,6 +97,15 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
+/* ── Página: el folio ── */
+.folio { max-width: 1160px; margin: 0 auto; padding: 32px 40px 72px; }
+@media (max-width: 640px) { .folio { padding: 20px 16px 56px; } }
+/* Título de sección: Caslon de display, sin mayúsculas ni filete (pisa el h2 de tokens.css). */
+.folio-h2 {
+  font: 400 var(--fs-h3)/1.25 var(--display); color: var(--ink);
+  margin: 0 0 14px; padding: 0; border: 0; letter-spacing: 0; text-transform: none;
+}
+
 /* ── Controles de texto: sin caja, como una nota al margen ── */
 .ctl {
   font: 400 var(--fs-small)/1.2 var(--serif); color: var(--ink2);

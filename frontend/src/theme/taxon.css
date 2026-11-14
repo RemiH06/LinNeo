@@ -1,0 +1,99 @@
+/* ============================================================
+   Lámina de un taxón (TaxonNode): cabeza con linaje, hijos bajo la
+   llave por rango y notas al margen. Tokens en systema.css.
+============================================================ */
+
+/* ── Cabeza ── */
+.taxon-head { margin: 8px 0 44px; max-width: 62rem; }
+.taxon-rank { margin: 0 0 2px; font-style: italic; color: var(--ink2); line-height: 1.4; }
+.taxon-head h1 { font-size: var(--fs-h1); line-height: 1.05; margin: 0 0 14px; color: var(--accent); overflow-wrap: anywhere; }
+/* Caslon Display no tiene itálica: género y especie van en la itálica real de Caslon Text. */
+.taxon-head[data-rank="genus"] h1, .taxon-head[data-rank="species"] h1 { font-family: var(--serif); }
+
+.lineage { list-style: none; display: flex; flex-wrap: wrap; margin: 0 0 16px; padding: 0; font-size: var(--fs-small); color: var(--ink2); line-height: 1.9; }
+.lineage li + li::before { content: '›'; margin: 0 .5em; }
+.lineage a { color: var(--ink2); text-decoration-color: transparent; transition: color var(--t-fast) var(--ease-out); }
+.lineage a:hover { color: var(--accent); text-decoration-color: currentColor; }
+.lineage-here { color: var(--ink); font-weight: 700; }
+
+.taxon-summary { margin: 0 0 10px; max-width: 64ch; line-height: 1.6; }
+.taxon-views { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 0; font-size: var(--fs-small); line-height: 1.9; }
+.taxon-views a + a::before { content: '·'; display: inline-block; margin: 0 .7em; color: var(--ink2); }
+.taxon-error { color: var(--danger); margin: 24px 0; }
+
+/* ── Cuerpo: hijos y margen ── */
+.taxon-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 56px; align-items: start; }
+.taxon-main .folio-h2 { margin-bottom: 18px; }
+
+.taxon-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; margin-bottom: 6px; font-size: var(--fs-small); color: var(--ink2); }
+.tool-group { display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; }
+.tool-label { font-style: italic; }
+.tool-group label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; color: var(--ink); }
+.tool-group input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+
+.alpha { display: flex; flex-wrap: wrap; gap: 0 2px; margin: 0 0 10px; }
+.alpha button {
+  font: 400 15px/1 var(--serif); min-width: 24px; min-height: 32px; padding: 0 2px;
+  background: none; border: 0; border-bottom: 1px solid transparent; color: var(--ink2); cursor: pointer;
+}
+.alpha button:hover:not(:disabled) { color: var(--accent); }
+.alpha button[aria-pressed="true"] { color: var(--accent); border-bottom-color: currentColor; }
+.alpha button:disabled { opacity: .35; cursor: default; }
+
+.taxon-count { margin: 0 0 24px; font-size: var(--fs-small); font-style: italic; color: var(--ink2); }
+
+/* ── La llave: un grupo por rango ── */
+.rank-group { display: grid; grid-template-columns: 8.5rem minmax(0, 1fr); gap: 0 14px; margin: 0 0 40px; }
+.rank-label { text-align: right; padding-top: 1px; }
+.rank-label h3 { font: 400 22px/1.15 var(--display); margin: 0; padding: 0; border: 0; color: var(--ink); letter-spacing: 0; text-transform: none; }
+.rank-label .n { font-size: var(--fs-small); color: var(--ink2); }
+.rank-gap { margin: 6px 0 0; font-size: var(--fs-meta); font-style: italic; line-height: 1.4; color: var(--ink2); }
+
+/* flex-start: si el cuerpo se estirara al alto del SVG, la llave nunca se encogería al filtrar. */
+.brace { display: flex; align-items: flex-start; gap: 12px; }
+.brace-glyph { flex-shrink: 0; overflow: visible; }
+.brace-glyph path { fill: none; stroke: var(--k-ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.brace-body { flex: 1; min-width: 0; }
+
+.entries { list-style: none; margin: 0; padding: 2px 0; columns: 15rem; column-gap: 36px; }
+.entries li { break-inside: avoid; padding: 3px 0; line-height: 1.4; }
+.entries .taxon-name { color: var(--ink); text-decoration-color: transparent; transition: color var(--t-fast) var(--ease-out); }
+.entries .taxon-name:hover { color: var(--accent); text-decoration-color: currentColor; }
+.entry-note { margin-left: .5em; font-size: var(--fs-small); color: var(--ink2); }
+.iucn { margin-left: .5em; font-family: var(--code); font-size: 12px; color: var(--danger); text-decoration: none; cursor: help; }
+
+.load-more { margin-top: -12px; }
+
+/* ── Al margen ── */
+.taxon-margin { position: sticky; top: 24px; padding-left: 28px; border-left: 1px solid var(--rule); }
+.margin-stats { margin: 0 0 36px; font-size: var(--fs-small); }
+.margin-stats > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+.margin-stats dt { color: var(--ink2); }
+.margin-stats dd { margin: 0; color: var(--ink); }
+.margin-stats dd span { display: inline-block; min-width: 3.2em; text-align: right; color: var(--ink2); }
+.margin-note { margin: 0 0 10px; font-size: var(--fs-small); color: var(--ink2); line-height: 1.5; }
+
+.margin-map .leaflet-container { height: 190px; background: var(--paper2); border: 1px solid var(--rule); font-family: var(--serif); }
+.margin-map path.country { fill: var(--rule); fill-opacity: .55; stroke: var(--paper2); stroke-width: .4; }
+.margin-map path.country.on { fill: var(--k-ink); fill-opacity: .7; }
+.margin-map path.country.sel { fill-opacity: 1; stroke: var(--ink); stroke-width: 1.2; }
+.margin-map .leaflet-bar a { background: var(--paper); color: var(--ink); border-color: var(--rule); }
+.map-tip { font: 400 var(--fs-small)/1.3 var(--serif); background: var(--paper); color: var(--ink); border: 1px solid var(--border); border-radius: 2px; box-shadow: none; }
+.map-tip::before { display: none; }
+.continents { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 8px; }
+.continents .ctl[aria-pressed="true"] { color: var(--accent); text-decoration-color: currentColor; }
+
+/* ── Vertical ── */
+@media (max-width: 900px) {
+  .taxon-body { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .taxon-margin { position: static; padding: 28px 0 0; border-left: 0; border-top: 1px solid var(--rule); }
+}
+@media (max-width: 640px) {
+  .taxon-head { margin-bottom: 32px; }
+  .taxon-views { flex-direction: column; align-items: flex-start; }
+  .taxon-views a + a::before { content: none; }
+  .rank-group { grid-template-columns: minmax(0, 1fr); margin-bottom: 32px; }
+  .rank-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; text-align: left; margin-bottom: 8px; }
+  .rank-gap { flex-basis: 100%; margin-top: 2px; }
+  .entries { columns: 1; }
+}
