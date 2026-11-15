@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { kingdomInk } from '../theme/kingdomColor'
 import SiteHeader from '../components/SiteHeader'
+import SearchBox, { hrefOf } from '../components/SearchBox'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -22,13 +23,6 @@ const RANK_ES = {
 }
 const DEFAULT_KINGDOMS = ['Animalia', 'Plantae', 'Fungi']
 const LIST_MAX = 40  // hijos listados bajo el grafo; el resto está en la lámina
-
-// Resalta la subcadena de `text` que coincide con `query`.
-function highlightMatch(text, query) {
-  const idx = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1
-  if (idx === -1) return text
-  return <>{text.slice(0, idx)}<mark>{text.slice(idx, idx + query.length)}</mark>{text.slice(idx + query.length)}</>
-}
 
 // { dominio: [reinos] } a partir de los nodos y aristas reales del grafo inicial.
 function deriveDomainGroups(full) {
@@ -55,8 +49,6 @@ function Plate({ src }) {
   )
 }
 
-const hrefOf = (t) => (t.rank === 'species' ? `/species/${t.key}` : `/taxon/${t.rank}/${t.key}`)
-
 export default function Shui() {
   const navigate = useNavigate()
   const { dark, toggle: toggleTheme } = useTheme()
@@ -69,15 +61,7 @@ export default function Shui() {
   const [activeKingdoms, setActiveKingdoms] = useState(new Set())
   const [domainGroups, setDomainGroups] = useState([])
 
-  const [q, setQ] = useState('')
-  const [results, setResults] = useState([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState(false)
-  const [activeIdx, setActiveIdx] = useState(-1)
-  const [listOpen, setListOpen] = useState(false)
-  const searchTimer = useRef(null)
   const searchRef = useRef(null)
-  const searchWrapRef = useRef(null)
 
   const [examples, setExamples] = useState([])
   const [exLoading, setExLoading] = useState(true)
@@ -181,47 +165,7 @@ export default function Shui() {
     return on === 0 ? 'none' : on === group.kingdoms.length ? 'all' : 'partial'
   }
 
-  // ── Búsqueda (combobox) ──
-  function onSearch(value) {
-    setQ(value); setActiveIdx(-1); setListOpen(true)
-    clearTimeout(searchTimer.current)
-    if (value.trim().length < 2) { setResults([]); setSearchError(false); return }
-    searchTimer.current = setTimeout(() => {
-      setSearchLoading(true); setSearchError(false)
-      api.searchClades(value.trim(), 8)
-        .then((data) => {
-          const flat = []
-          for (const rank of Object.keys(data?.groups || {})) for (const g of data.groups[rank]) flat.push(...g.items)
-          setResults(flat)
-        })
-        .catch(() => { setResults([]); setSearchError(true) })
-        .finally(() => setSearchLoading(false))
-    }, 250)
-  }
-  function closeList() { setListOpen(false); setActiveIdx(-1) }
-  function openResult(r) { navigate(hrefOf(r)); setResults([]); setQ(''); closeList() }
-  function onSearchKeyDown(e) {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setListOpen(true); setActiveIdx((i) => Math.min(i + 1, results.length - 1)); return }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); return }
-    if (e.key === 'Escape') { closeList(); return }
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      const query = q.trim()
-      if (!query) return
-      if (activeIdx >= 0 && results[activeIdx]) return openResult(results[activeIdx])
-      const exact = results.find((r) => r.name?.toLowerCase() === query.toLowerCase())
-      if (exact) return openResult(exact)
-      navigate(`/search?q=${encodeURIComponent(query)}`)
-    }
-  }
-  useEffect(() => {
-    const onDown = (e) => { if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) closeList() }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [])
-
   function resetAll() {
-    setQ(''); setResults([]); closeList()
     const names = kingdoms.map((k) => k.name)
     setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
     focusOn(null)
@@ -245,40 +189,11 @@ export default function Shui() {
       .sort((a, b) => RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank) || a.name.localeCompare(b.name))
   })()
   const centerName = focusNode?.name || 'Biota'
-  const showList = listOpen && q.trim().length >= 2
 
   return (
     <div className="folio home">
       <SiteHeader back={false}>
-        <div className="search" ref={searchWrapRef}>
-          <label htmlFor="buscar" className="sr-only">Buscar un taxón</label>
-          <input id="buscar" ref={searchRef} className="search-input" type="search" value={q} autoComplete="off"
-            role="combobox" aria-expanded={showList} aria-controls="sugerencias" aria-autocomplete="list"
-            aria-activedescendant={activeIdx >= 0 ? `sug-${activeIdx}` : undefined}
-            onChange={(e) => onSearch(e.target.value)} onKeyDown={onSearchKeyDown} onFocus={() => setListOpen(true)}
-            placeholder="Buscar especie o grupo…" />
-          {showList && (
-            <ul id="sugerencias" className="search-list" role="listbox" aria-label="Sugerencias">
-              {searchLoading && <li className="search-status" role="presentation">Buscando…</li>}
-              {!searchLoading && searchError && <li className="search-status" role="presentation">No se pudo buscar.</li>}
-              {!searchLoading && !searchError && results.length === 0 && (
-                <li className="search-status" role="presentation">Sin coincidencias. Enter busca clados que contengan «{q.trim()}».</li>
-              )}
-              {!searchLoading && !searchError && results.map((r, i) => (
-                <li key={`${r.rank}:${r.key}`} id={`sug-${i}`} role="option" aria-selected={i === activeIdx}
-                  className="search-option" data-rank={r.rank}
-                  onMouseDown={(e) => { e.preventDefault(); openResult(r) }} onMouseEnter={() => setActiveIdx(i)}>
-                  <span className="dot" style={{ background: kingdomInk(r.kingdom, dark) }} aria-hidden="true" />
-                  <span className="taxon-name">{highlightMatch(r.name, q.trim())}</span>
-                  <span className="search-meta">
-                    {RANK_ES[r.rank] || r.rank}{r.parent ? ` en ${r.parent}` : ''}{r.kingdom && r.kingdom !== r.parent ? ` · ${r.kingdom}` : ''}
-                  </span>
-                  {r.common_names?.length > 0 && <span className="search-common">{r.common_names.slice(0, 2).join(', ')}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <SearchBox inputRef={searchRef} />
         <button type="button" className="ctl" onClick={resetAll}>Reiniciar</button>
       </SiteHeader>
 

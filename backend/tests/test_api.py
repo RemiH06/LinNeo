@@ -49,8 +49,9 @@ TREE = [
 ]
 ONCA, LEO, MINOR, ROBUR = 5219426, 5219404, 51, 2878688
 SPECIES = {
-    ONCA: {"commonNames": ["jaguar", "yaguar", "onça-pintada"],
-           "commonNamesLanguages": ["en", "es", "pt"], "iucn": "NT",
+    ONCA: {"commonNames": ["Jaguar", "jaguar", "yaguar", "onça-pintada"],
+           "commonNamesLanguages": ["de", "en", "es", "pt"], "iucn": "NT",
+           "synonyms": ["Felis onca"],
            "images": 2, "sounds": 1, "texts": ["summary", "reference"],
            "countries": {"MX": "native", "BR": "native"}},
     LEO: {"commonNames": ["lion"], "commonNamesLanguages": ["en"], "iucn": "VU",
@@ -109,7 +110,7 @@ def load_fixture(driver):
         if sp:
             props.update(commonNames=sp["commonNames"],
                          commonNamesLanguages=sp["commonNamesLanguages"],
-                         conservation_overall_code=sp["iucn"])
+                         conservation_overall_code=sp["iucn"], synonyms=sp.get("synonyms", []))
         label = rank[0].upper() + rank[1:]
         driver.execute_query(f"CREATE (t:Taxon:{label}) SET t = $props", props=props)
         if parent is not None:
@@ -259,6 +260,10 @@ class ApiTest(unittest.TestCase):
     def test_search_puts_exact_first(self):
         r = self.get("/search?q=jaguar")
         self.assertEqual(r["results"][0]["key"], ONCA)
+        top = r["results"][0]
+        self.assertEqual(top["common_names"], ["yaguar", "jaguar", "onça-pintada"])  # es, en, sin repetidos
+        self.assertEqual(top["parent"], "Panthera")
+        self.assertEqual(self.get("/search?q=felis onca")["results"][0]["synonym_match"], "Felis onca")
         self.assertIn(MINOR, [x["key"] for x in r["results"]])
         r = self.get("/search?q=jaguar&offset=1&limit=1")
         self.assertEqual([x["key"] for x in r["results"]], [MINOR])

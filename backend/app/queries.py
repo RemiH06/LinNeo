@@ -37,12 +37,19 @@ LANG_ORDER = {"es": 0, "en": 1}  # nombre común preferido: español, luego ingl
 
 
 def _by_language(names, langs):
-    """Nombres comunes con los de español primero y luego los de inglés; el resto, en su orden."""
+    """Nombres comunes con los de español primero y luego los de inglés; el resto, en su orden.
+
+    Sin repetidos: "Jaguar" en inglés, alemán y francés sale una vez.
+    """
     if not names:
         return names
     langs = langs or [None] * len(names)
     pairs = sorted(zip(names, langs), key=lambda p: LANG_ORDER.get(p[1], len(LANG_ORDER)))
-    return [n for n, _ in pairs]
+    seen, out = set(), []
+    for n, _ in pairs:
+        if n.lower() not in seen:
+            seen.add(n.lower()); out.append(n)
+    return out
 
 
 def _f(template, v):
@@ -88,10 +95,22 @@ def search(term, offset=0, limit=25):
                     WHERE toLower(x) = $exact) AS exact
         RETURN t.taxonID AS key, t.name AS name, t.scientific_name AS scientific_name,
                t.rank AS rank, t.kingdom AS kingdom, t.commonNames AS common_names,
+               t.commonNamesLanguages AS langs,
+               // qué sinónimo explica la coincidencia, para decirlo en la interfaz
+               head([x IN coalesce(t.synonyms, []) WHERE toLower(x) CONTAINS $exact]) AS synonym_match,
                exact, size(coalesce(t.commonNames, [])) AS richness, score
         ORDER BY exact DESC, richness DESC, score DESC
     """, q=query, window=SEARCH_WINDOW, exact=" ".join(term.lower().split()))
-    return {"total": len(rows), "results": rows[offset:offset + limit]}
+    page = rows[offset:offset + limit]
+    # El padre distingue homónimos; solo para la página, no para la ventana completa.
+    parents = {r["key"]: r["parent"] for r in _run("""
+        UNWIND $keys AS k MATCH (p:Taxon)-[:HAS_CHILD]->(:Taxon {taxonID: k})
+        RETURN k AS key, p.name AS parent
+    """, keys=[r["key"] for r in page])} if page else {}
+    for r in page:
+        r["common_names"] = _by_language(r["common_names"], r.pop("langs"))
+        r["parent"] = parents.get(r["key"])
+    return {"total": len(rows), "results": page}
 
 
 # La data no cambia mientras la API corre (un import exige reiniciarla), así que

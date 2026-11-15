@@ -16,7 +16,7 @@ from fastapi.responses import Response
 
 from . import db, queries
 
-API_VERSION = "2.2.0"
+API_VERSION = "2.3.0"
 PROD = os.getenv("LINNEO_ENV") == "prod"
 # En prod el front y la API comparten origen; CORS solo hace falta en desarrollo.
 CORS_ORIGINS = [o for o in os.getenv("CORS_ORIGINS", "http://localhost:5135").split(",") if o]
