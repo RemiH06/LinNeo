@@ -130,7 +130,9 @@ def search_clades_by_rank(term, rank, limit_per_group=100, mode="contains"):
         WITH n ORDER BY {order}
         WITH {group} AS kingdom, collect(n)[0..$lim] AS ns
         UNWIND ns AS n
-        WITH kingdom, n {{.name, key: n.taxonID, .rank, .kingdom{extra}}} AS item
+        // El padre distingue homónimos (dos Cepolidae en Animalia) en las sugerencias.
+        WITH kingdom, n {{.name, key: n.taxonID, .rank, .kingdom{extra},
+                         parent: head(COLLECT {{ MATCH (p:Taxon)-[:HAS_CHILD]->(n) RETURN p.name }})}} AS item
         RETURN kingdom, collect(item) AS items
     """, t=t, rank=rank, lim=limit_per_group)
 

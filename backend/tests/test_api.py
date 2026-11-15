@@ -269,6 +269,7 @@ class ApiTest(unittest.TestCase):
     def test_search_clades(self):
         r = self.get("/search/clades/species?q=onca")
         self.assertEqual(r["groups"][0]["items"][0]["key"], ONCA)
+        self.assertEqual(r["groups"][0]["items"][0]["parent"], "Panthera")
         r = self.get("/search/clades/species?q=on&mode=starts")
         self.assertEqual([i["key"] for g in r["groups"] for i in g["items"]], [ONCA])
         r = self.get("/search/clades/species?q=pan&mode=starts")

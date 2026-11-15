@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { thumb } from '../api/media'
 import ShuiGraph from '../components/ShuiGraph'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
@@ -9,85 +10,78 @@ import SiteHeader from '../components/SiteHeader'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
-import '../theme/shui.css'
+import '../theme/home.css'
 
-// Hex de 6 dígitos: el resplandor le agrega alfa (`${glowFor(...)}55`).
-const glowFor = kingdomInk
-const swatchFor = kingdomInk
+// Inicio: buscador, grafo de Biota → dominios → reinos (o del taxón en foco),
+// filtro por reino y especies al azar.
 
-const RANK_ES_SHORT = {
-  domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase',
-  order: 'Orden', family: 'Familia', genus: 'Genero', species: 'Especie',
+const RANKS = ['biota', 'domain', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+const RANK_ES = {
+  biota: 'Biota', domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase',
+  order: 'Orden', family: 'Familia', genus: 'Género', species: 'Especie',
 }
-
-// Resalta la subcadena de `text` que coincide con `query` (case-insensitive).
-function highlightMatch(text, query) {
-  if (!query) return text
-  const idx = text.toLowerCase().indexOf(query.toLowerCase())
-  if (idx === -1) return text
-  return (
-    <>
-      {text.slice(0, idx)}
-      <mark className="sh-match">{text.slice(idx, idx + query.length)}</mark>
-      {text.slice(idx + query.length)}
-    </>
-  )
-}
-
-// Reinos activos por defecto (el resto arranca desmarcado)
 const DEFAULT_KINGDOMS = ['Animalia', 'Plantae', 'Fungi']
+const LIST_MAX = 40  // hijos listados bajo el grafo; el resto está en la lámina
 
-// Deriva { domainName: [{key,name}, ...] } a partir de los nodos/links reales del
-// grafo inicial (Biota->Domain->Kingdom), en vez de hardcodear el agrupamiento.
+// Resalta la subcadena de `text` que coincide con `query`.
+function highlightMatch(text, query) {
+  const idx = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1
+  if (idx === -1) return text
+  return <>{text.slice(0, idx)}<mark>{text.slice(idx, idx + query.length)}</mark>{text.slice(idx + query.length)}</>
+}
+
+// { dominio: [reinos] } a partir de los nodos y aristas reales del grafo inicial.
 function deriveDomainGroups(full) {
   if (!full) return []
   const byId = Object.fromEntries(full.nodes.map((n) => [n.id, n]))
-  const domains = full.nodes.filter((n) => n.rank === 'domain')
-  return domains.map((d) => {
-    const kingdomIds = full.links.filter((l) => l.source === d.id).map((l) => l.target)
-    const kids = kingdomIds.map((id) => byId[id]).filter((n) => n && n.rank === 'kingdom')
-    return { id: d.id, name: d.name, kingdoms: kids }
-  })
+  return full.nodes.filter((n) => n.rank === 'domain').map((d) => ({
+    id: d.id, name: d.name,
+    kingdoms: full.links.filter((l) => l.source === d.id).map((l) => byId[l.target]).filter((n) => n?.rank === 'kingdom'),
+  }))
 }
+
+// Imagen de la lámina: miniatura primero, luego el original (una miniatura más ancha
+// que el original falla) y al final el letrero, nunca el ícono roto.
+function Plate({ src }) {
+  const tries = src ? [...new Set([thumb(src), src])] : []
+  const [i, setI] = useState(0)
+  useEffect(() => setI(0), [src])
+  return (
+    <span className="plate">
+      {i < tries.length
+        ? <img src={tries[i]} alt="" loading="lazy" onError={() => setI((n) => n + 1)} />
+        : <span className="plate-empty">Sin lámina</span>}
+    </span>
+  )
+}
+
+const hrefOf = (t) => (t.rank === 'species' ? `/species/${t.key}` : `/taxon/${t.rank}/${t.key}`)
 
 export default function Shui() {
   const navigate = useNavigate()
   const { dark, toggle: toggleTheme } = useTheme()
 
   const [graphData, setGraphData] = useState(null)
+  const [fullGraph, setFullGraph] = useState(null)  // Biota → dominios → reinos, sin filtrar
   const [focusKingdom, setFocusKingdom] = useState(null)
   const [focusNode, setFocusNode] = useState(null)
-
-  // reinos y cuales estan activos (checkboxes izquierda)
   const [kingdoms, setKingdoms] = useState([])
   const [activeKingdoms, setActiveKingdoms] = useState(new Set())
   const [domainGroups, setDomainGroups] = useState([])
 
-  // buscador
   const [q, setQ] = useState('')
   const [results, setResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [searchError, setSearchError] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
+  const [listOpen, setListOpen] = useState(false)
   const searchTimer = useRef(null)
   const searchRef = useRef(null)
-  const resultsWrapRef = useRef(null)
+  const searchWrapRef = useRef(null)
 
-  // barra inferior (cajon deslizable)
   const [examples, setExamples] = useState([])
   const [exLoading, setExLoading] = useState(true)
   const [exError, setExError] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const drawerCloseTimer = useRef(null)
-
-  function openDrawer() {
-    clearTimeout(drawerCloseTimer.current)
-    setDrawerOpen(true)
-  }
-  function scheduleCloseDrawer() {
-    clearTimeout(drawerCloseTimer.current)
-    drawerCloseTimer.current = setTimeout(() => setDrawerOpen(false), 250)
-  }
 
   useSetKingdom(focusKingdom)
   const initialTimer = useElapsedTimer()
@@ -99,85 +93,67 @@ export default function Shui() {
     initialTimer.start()
     let pending = 2
     const settle = () => { pending -= 1; if (pending === 0) { setInitialLoading(false); initialTimer.stop() } }
-    api.graph().then((g) => { setGraphData(g); setFullGraph(g); setDomainGroups(deriveDomainGroups(g)); settle() }).catch(settle)
+    api.graph().then((g) => { setFullGraph(g); setDomainGroups(deriveDomainGroups(g)) }).finally(settle)
     api.kingdoms().then((ks) => {
       setKingdoms(ks)
       const names = ks.map((k) => k.name)
       setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
-      settle()
-    }).catch(settle)
-    // nota: la barra de ejemplos NO se carga aqui -- el useEffect reactivo a
-    // activeKingdoms (abajo) ya la dispara en cuanto setActiveKingdoms
-    // resuelve con los reinos default, evitando una doble carga/parpadeo.
+    }).finally(settle)
+    // El grafo visible y los ejemplos los arma el efecto de abajo cuando ya están el grafo y los reinos.
   }, [])
 
-  // guardamos el grafo completo para filtrar por reino sin re-pedir
-  const fullGraphRef = useRef(null)
-  const setFullGraph = (g) => { fullGraphRef.current = g }
-
-  // recalcular grafo visible al cambiar checkboxes (solo en vista Biota)
+  // Vista Biota: el grafo visible respeta los reinos marcados. Depende de fullGraph para no
+  // perder la primera vuelta si /kingdoms responde antes que /graph.
   useEffect(() => {
-    if (focusNode || !fullGraphRef.current) return
-    const full = fullGraphRef.current
-    const keepKingdomNames = activeKingdoms
-    // nodos: biota + TODOS los dominios (siempre visibles) + reinos activos
-    const nodes = full.nodes.filter((n) => {
-      if (n.rank === 'biota' || n.rank === 'domain') return true
-      return keepKingdomNames.has(n.kingdom)
-    })
+    if (focusNode || !fullGraph || initialLoading) return
+    const full = fullGraph
+    const nodes = full.nodes.filter((n) => n.rank === 'biota' || n.rank === 'domain' || activeKingdoms.has(n.kingdom))
     const ids = new Set(nodes.map((n) => n.id))
-    const links = full.links.filter((l) => ids.has(l.source) && ids.has(l.target))
-    setGraphData({ ...full, nodes, links })
-    // la barra de ejemplos tambien debe respetar el pot de reinos activos
+    setGraphData({ ...full, nodes, links: full.links.filter((l) => ids.has(l.source) && ids.has(l.target)) })
     loadKingdomExamples()
-  }, [activeKingdoms, focusNode])
+  }, [activeKingdoms, focusNode, fullGraph, initialLoading])
 
-  // Pot de ejemplos: n tiradas, cada una elige un reino al azar DENTRO de los
-  // reinos activos (no 1 garantizado por reino). Vacio = usa todos los reinos.
   function loadKingdomExamples() {
     setExLoading(true); setExError(false)
-    api.randomPool([...activeKingdoms], 8).then((rows) => {
-      setExamples(rows || []); setExLoading(false)
-    }).catch(() => { setExError(true); setExLoading(false) })
+    api.randomPool([...activeKingdoms], 8)
+      .then((rows) => setExamples(rows || []))
+      .catch(() => setExError(true))
+      .finally(() => setExLoading(false))
+  }
+  function reloadExamples() {
+    if (!focusNode) return loadKingdomExamples()
+    setExLoading(true); setExError(false)
+    api.randomDescendants(focusNode.key, 8)
+      .then((rows) => setExamples(rows || []))
+      .catch(() => setExError(true))
+      .finally(() => setExLoading(false))
   }
 
-  // contador de "operacion vigente": cada llamada a focusOn (sea foco o
-  // reset) lo incrementa; una promesa que resuelve tarde solo aplica sus
-  // cambios si su id sigue siendo el vigente. Evita que un click en un nodo
-  // "reviva" el foco despues de que el usuario ya presiono Reiniciar
-  // mientras la respuesta de graphFocus seguia en vuelo.
+  // Cada foco (o reinicio) incrementa el contador; una respuesta tardía solo se
+  // aplica si su operación sigue siendo la vigente.
   const focusOpRef = useRef(0)
-
   function focusOn(node) {
     const opId = ++focusOpRef.current
     if (!node) {
-      setGraphData(fullGraphRef.current)
       setFocusKingdom(null); setFocusNode(null)
       setFocusLoading(false); focusTimer.stop()
-      loadKingdomExamples()
-      return
+      return   // el efecto de activeKingdoms/focusNode rehace el grafo y los ejemplos
     }
-    if (focusLoading) return // evita carreras si se hace click varias veces mientras carga
     setFocusLoading(true)
     focusTimer.start()
     api.graphFocus(node.key).then((g) => {
-      if (focusOpRef.current !== opId) return // una operacion mas reciente (otro click o un reset) ya tomo el control
-      // Fallback: si el backend no pudo determinar el reino del nuevo nodo
-      // (rangos como Phylum/Class/Order/Family no tienen su propia propiedad
-      // 'kingdom' poblada en Neo4j -- solo Species/Genus la tienen, y Kingdom
-      // usa su propio nombre), se mantiene el reino del foco anterior en vez
-      // de perderlo. Al navegar SIEMPRE bajamos dentro del mismo reino o nos
-      // quedamos igual, nunca subimos a otro, asi que el valor previo sigue
-      // siendo correcto.
+      if (focusOpRef.current !== opId) return
+      // Al bajar nunca se cambia de reino: si el backend no lo sabe, se conserva el anterior.
       const nextKingdom = g.kingdom || focusKingdom
       setGraphData({ ...g, kingdom: nextKingdom })
       setFocusKingdom(nextKingdom)
       setFocusNode(node)
       setFocusLoading(false); focusTimer.stop()
       setExLoading(true); setExError(false)
-      api.randomDescendants(node.key, 9)
-        .then((rows) => { if (focusOpRef.current === opId) { setExamples(rows || []); setExLoading(false) } })
-        .catch(() => { if (focusOpRef.current === opId) { setExError(true); setExLoading(false) } })
+      api.randomDescendants(node.key, 8)
+        .then((rows) => { if (focusOpRef.current === opId) setExamples(rows || []) })
+        .catch(() => { if (focusOpRef.current === opId) setExError(true) })
+        .finally(() => { if (focusOpRef.current === opId) setExLoading(false) })
     }).catch(() => {
       if (focusOpRef.current === opId) { setFocusLoading(false); focusTimer.stop() }
     })
@@ -190,9 +166,7 @@ export default function Shui() {
       return next
     })
   }
-
-  // Click en el checkbox de un Domain: si todos sus reinos estan activos, los
-  // desactiva todos; si no, activa los que falten (selecciona el grupo completo).
+  // Marcar un dominio: si todos sus reinos están, los quita; si no, agrega los que falten.
   function toggleDomain(group) {
     const names = group.kingdoms.map((k) => k.name)
     setActiveKingdoms((prev) => {
@@ -202,284 +176,203 @@ export default function Shui() {
       return next
     })
   }
-  // Estado del checkbox padre: 'all' | 'none' | 'partial' (indeterminate)
-  function domainCheckState(group) {
-    const names = group.kingdoms.map((k) => k.name)
-    if (names.length === 0) return 'none'
-    const onCount = names.filter((n) => activeKingdoms.has(n)).length
-    if (onCount === 0) return 'none'
-    if (onCount === names.length) return 'all'
-    return 'partial'
+  function domainState(group) {
+    const on = group.kingdoms.filter((k) => activeKingdoms.has(k.name)).length
+    return on === 0 ? 'none' : on === group.kingdoms.length ? 'all' : 'partial'
   }
 
+  // ── Búsqueda (combobox) ──
   function onSearch(value) {
-    setQ(value)
-    setActiveIdx(-1)
+    setQ(value); setActiveIdx(-1); setListOpen(true)
     clearTimeout(searchTimer.current)
     if (value.trim().length < 2) { setResults([]); setSearchError(false); return }
     searchTimer.current = setTimeout(() => {
       setSearchLoading(true); setSearchError(false)
       api.searchClades(value.trim(), 8)
         .then((data) => {
-          // aplanar { groups: { rank: [{kingdom, items}] } } a una lista plana
-          // de sugerencias, manteniendo rank/kingdom para mostrar contexto.
           const flat = []
-          const groups = data?.groups || {}
-          for (const rank of Object.keys(groups)) {
-            for (const g of groups[rank]) {
-              for (const item of g.items) flat.push(item)
-            }
-          }
+          for (const rank of Object.keys(data?.groups || {})) for (const g of data.groups[rank]) flat.push(...g.items)
           setResults(flat)
-          setSearchLoading(false)
         })
-        .catch(() => { setResults([]); setSearchError(true); setSearchLoading(false) })
+        .catch(() => { setResults([]); setSearchError(true) })
+        .finally(() => setSearchLoading(false))
     }, 250)
   }
-
-  function resultHref(r) {
-    return r.rank === 'species' ? `/species/${r.key}` : `/taxon/${r.rank}/${r.key}`
-  }
-  function openResult(r) {
-    navigate(resultHref(r))
-    setResults([]); setQ(''); setActiveIdx(-1)
-  }
-
+  function closeList() { setListOpen(false); setActiveIdx(-1) }
+  function openResult(r) { navigate(hrefOf(r)); setResults([]); setQ(''); closeList() }
   function onSearchKeyDown(e) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setActiveIdx((i) => Math.min(i + 1, results.length - 1))
-      return
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setActiveIdx((i) => Math.max(i - 1, -1))
-      return
-    }
-    if (e.key === 'Escape') {
-      setResults([]); setActiveIdx(-1)
-      return
-    }
+    if (e.key === 'ArrowDown') { e.preventDefault(); setListOpen(true); setActiveIdx((i) => Math.min(i + 1, results.length - 1)); return }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); return }
+    if (e.key === 'Escape') { closeList(); return }
     if (e.key === 'Enter') {
       e.preventDefault()
       const query = q.trim()
       if (!query) return
-      // si hay una sugerencia resaltada con las flechas, esa manda
-      if (activeIdx >= 0 && results[activeIdx]) {
-        openResult(results[activeIdx])
-        return
-      }
-      // si alguna sugerencia coincide EXACTO (case-insensitive) con lo escrito,
-      // se abre directo; si no, se va a la vista de resultados de busqueda.
+      if (activeIdx >= 0 && results[activeIdx]) return openResult(results[activeIdx])
       const exact = results.find((r) => r.name?.toLowerCase() === query.toLowerCase())
-      if (exact) { openResult(exact); return }
+      if (exact) return openResult(exact)
       navigate(`/search?q=${encodeURIComponent(query)}`)
-      setResults([]); setActiveIdx(-1)
     }
   }
+  useEffect(() => {
+    const onDown = (e) => { if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) closeList() }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
 
   function resetAll() {
-    setQ(''); setResults([])
+    setQ(''); setResults([]); closeList()
     const names = kingdoms.map((k) => k.name)
     setActiveKingdoms(new Set(DEFAULT_KINGDOMS.filter((n) => names.includes(n))))
     focusOn(null)
   }
 
-  function selectAllKingdoms() {
-    setActiveKingdoms(new Set(kingdoms.map((k) => k.name)))
-  }
-  function deselectAllKingdoms() {
-    setActiveKingdoms(new Set())
-  }
-  function navigateToList() {
-    if (focusNode) navigate(`/taxon/${focusNode.rank}/${focusNode.key}`)
-  }
-
   useKeyboardShortcuts({
-    navigate,
-    toggleTheme,
+    navigate, toggleTheme,
     shui: {
-      searchRef,
-      resetAll,
-      reloadExamples: () => focusNode
-        ? api.randomDescendants(focusNode.key, 9).then(setExamples)
-        : loadKingdomExamples(),
-      openDrawer,
-      navigateToList,
-      selectAllKingdoms,
-      deselectAllKingdoms,
+      searchRef, resetAll, reloadExamples,
+      navigateToList: () => focusNode && navigate(hrefOf(focusNode)),
+      selectAllKingdoms: () => setActiveKingdoms(new Set(kingdoms.map((k) => k.name))),
+      deselectAllKingdoms: () => setActiveKingdoms(new Set()),
     },
   })
 
-  // cerrar el dropdown de sugerencias al hacer clic fuera
-  useEffect(() => {
-    function onClickOutside(e) {
-      if (resultsWrapRef.current && !resultsWrapRef.current.contains(e.target)) {
-        setResults([]); setActiveIdx(-1)
-      }
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [])
+  // Primer nivel del grafo, para la lista navegable de abajo.
+  const level1 = (() => {
+    if (!graphData) return []
+    const byId = Object.fromEntries(graphData.nodes.map((n) => [n.id, n]))
+    return graphData.links.filter((l) => l.source === graphData.center).map((l) => byId[l.target]).filter(Boolean)
+      .sort((a, b) => RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank) || a.name.localeCompare(b.name))
+  })()
+  const centerName = focusNode?.name || 'Biota'
+  const showList = listOpen && q.trim().length >= 2
 
   return (
-    <div className="shui-scope">
-      {/* luz del reino al hacer focus */}
-      <div className="sh-kingdom-glow" style={{
-        background: focusKingdom
-          ? `radial-gradient(circle at 50% 100%, ${glowFor(focusKingdom, dark)}55 0%, transparent 65%)`
-          : 'transparent',
-      }} />
-
-      <div className="sh-page">
-        <div className="sh-top">
-          <SiteHeader back={false}>
-            <div className="sh-searchbar" ref={resultsWrapRef}>
-              <input ref={searchRef} className="sh-input" value={q}
-                onChange={(e) => onSearch(e.target.value)}
-                onKeyDown={onSearchKeyDown}
-                placeholder="Buscar por nombre comun o cientifico..." />
-              {(q.trim().length > 0) && (
-                <div className="sh-results">
-                  {searchLoading && <div className="sh-result sh-result-status">Buscando...</div>}
-                  {!searchLoading && searchError && <div className="sh-result sh-result-status">Error al buscar.</div>}
-                  {!searchLoading && !searchError && results.length === 0 && (
-                    <div className="sh-result sh-result-status">Sin resultados. Enter para ver clados que contengan "{q.trim()}".</div>
-                  )}
-                  {!searchLoading && !searchError && results.map((r, i) => (
-                    <a key={`${r.rank}:${r.key}`} className={`sh-result ${i === activeIdx ? 'active' : ''}`}
-                      href={resultHref(r)}
-                      onClick={(e) => { e.preventDefault(); openResult(r) }}
-                      onMouseEnter={() => setActiveIdx(i)}>
-                      <span className="sh-swatch" style={{ background: swatchFor(r.kingdom, dark) }} />
-                      <span className="sci">{highlightMatch(r.name, q.trim())}</span>
-                      <span className="sh-result-meta">
-                        {RANK_ES_SHORT[r.rank] || r.rank}{r.kingdom ? ` · ${r.kingdom}` : ''}
-                      </span>
-                      {r.common_names?.length > 0 && <span className="common"> - {r.common_names.slice(0, 3).join(', ')}</span>}
-                    </a>
-                  ))}
-                </div>
+    <div className="folio home">
+      <SiteHeader back={false}>
+        <div className="search" ref={searchWrapRef}>
+          <label htmlFor="buscar" className="sr-only">Buscar un taxón</label>
+          <input id="buscar" ref={searchRef} className="search-input" type="search" value={q} autoComplete="off"
+            role="combobox" aria-expanded={showList} aria-controls="sugerencias" aria-autocomplete="list"
+            aria-activedescendant={activeIdx >= 0 ? `sug-${activeIdx}` : undefined}
+            onChange={(e) => onSearch(e.target.value)} onKeyDown={onSearchKeyDown} onFocus={() => setListOpen(true)}
+            placeholder="Buscar especie o grupo…" />
+          {showList && (
+            <ul id="sugerencias" className="search-list" role="listbox" aria-label="Sugerencias">
+              {searchLoading && <li className="search-status" role="presentation">Buscando…</li>}
+              {!searchLoading && searchError && <li className="search-status" role="presentation">No se pudo buscar.</li>}
+              {!searchLoading && !searchError && results.length === 0 && (
+                <li className="search-status" role="presentation">Sin coincidencias. Enter busca clados que contengan «{q.trim()}».</li>
               )}
-            </div>
-            <button type="button" className="ctl" onClick={resetAll}>Reiniciar</button>
-          </SiteHeader>
+              {!searchLoading && !searchError && results.map((r, i) => (
+                <li key={`${r.rank}:${r.key}`} id={`sug-${i}`} role="option" aria-selected={i === activeIdx}
+                  className="search-option" data-rank={r.rank}
+                  onMouseDown={(e) => { e.preventDefault(); openResult(r) }} onMouseEnter={() => setActiveIdx(i)}>
+                  <span className="dot" style={{ background: kingdomInk(r.kingdom, dark) }} aria-hidden="true" />
+                  <span className="taxon-name">{highlightMatch(r.name, q.trim())}</span>
+                  <span className="search-meta">
+                    {RANK_ES[r.rank] || r.rank}{r.parent ? ` en ${r.parent}` : ''}{r.kingdom && r.kingdom !== r.parent ? ` · ${r.kingdom}` : ''}
+                  </span>
+                  {r.common_names?.length > 0 && <span className="search-common">{r.common_names.slice(0, 2).join(', ')}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+        <button type="button" className="ctl" onClick={resetAll}>Reiniciar</button>
+      </SiteHeader>
 
-        {/* Cuerpo: barra izquierda + grafo + barra derecha */}
-        <div className="sh-body">
-          {/* Izquierda: reinos */}
-          <aside className="sh-side">
-            <h3>Reinos</h3>
-            {domainGroups.map((g) => {
-              const state = domainCheckState(g)
-              return (
-                <div key={g.id} className="sh-domain-group">
-                  <label className="sh-check sh-check-domain">
-                    <input
-                      type="checkbox"
-                      checked={state === 'all'}
+      <div className="home-body">
+        <aside className="home-kingdoms" aria-labelledby="reinos-t">
+          <h2 id="reinos-t" className="folio-h2">Reinos</h2>
+          {domainGroups.map((g) => {
+            const state = domainState(g)
+            return (
+              <fieldset key={g.id} className="domain" disabled={!!focusNode}>
+                <legend>
+                  <label className="check">
+                    <input type="checkbox" checked={state === 'all'}
                       ref={(el) => { if (el) el.indeterminate = state === 'partial' }}
-                      onChange={() => toggleDomain(g)}
-                      disabled={!!focusNode}
-                    />
-                    <span className="sh-domain-name">{g.name}</span>
+                      onChange={() => toggleDomain(g)} disabled={!!focusNode} />
+                    <span className="domain-name">{g.name}</span>
                   </label>
-                  <div className="sh-kingdom-sublist">
-                    {g.kingdoms.map((k) => (
-                      <label key={k.key} className="sh-check sh-check-sub">
-                        <input type="checkbox" checked={activeKingdoms.has(k.name)} onChange={() => toggleKingdom(k.name)} disabled={!!focusNode} />
-                        <span className="sh-swatch" style={{ background: swatchFor(k.name, dark) }} />
-                        {k.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
-            {focusNode && <p style={{ fontSize: 10, color: 'var(--sh-text2)', marginTop: 10 }}>Reinicia el grafo para filtrar por reino.</p>}
-          </aside>
+                </legend>
+                {g.kingdoms.map((k) => (
+                  <label key={k.key} className="check kingdom">
+                    <input type="checkbox" checked={activeKingdoms.has(k.name)} onChange={() => toggleKingdom(k.name)} />
+                    <span className="dot" style={{ background: kingdomInk(k.name, dark) }} aria-hidden="true" />
+                    {k.name}
+                  </label>
+                ))}
+              </fieldset>
+            )
+          })}
+          {focusNode && <p className="home-note">Reinicia el grafo para volver a filtrar por reino.</p>}
+        </aside>
 
-          {/* Centro: grafo */}
-          <div className="sh-center-col">
-            <div className="sh-graph-wrap">
-              {(initialLoading || focusLoading) && (
-                <div className="ln-map-overlay">
-                  <LoadingSpinner
-                    inline={false}
-                    timeText={
-                      focusLoading
-                        ? (focusTimer.elapsedMs != null ? formatElapsed(focusTimer.elapsedMs) : null)
-                        : (initialTimer.elapsedMs != null ? formatElapsed(initialTimer.elapsedMs) : null)
-                    }
-                  />
-                </div>
-              )}
-              {graphData && <ShuiGraph data={graphData} onFocus={focusOn} onOpenSpecies={(k) => navigate(`/species/${k}`)} />}
-            </div>
+        <section className="home-main" aria-labelledby="centro">
+          <div className="home-head" data-rank={focusNode?.rank}>
+            <p className="taxon-rank">{focusNode ? RANK_ES[focusNode.rank] : 'Árbol de la vida'}</p>
+            <h1 id="centro" className="taxon-name">{centerName}</h1>
           </div>
 
-          {/* Derecha: geografia + vista */}
-          <aside className="sh-side right">
-            <h3>Geografia</h3>
-            <button
-              className="sh-kbtn"
-              style={{ width: '100%' }}
-              onClick={() => navigate('/map')}
-            >
-              Ver en mapa
-            </button>
-
-            <h3 style={{ marginTop: 22 }}>Vista</h3>
-            <button
-              className="sh-kbtn"
-              style={{ width: '100%' }}
-              disabled={!focusNode}
-              title={focusNode ? '' : 'Selecciona un nodo del grafo para explorarlo como lista'}
-              onClick={() => focusNode && navigate(`/taxon/${focusNode.rank}/${focusNode.key}`)}
-            >
-              Explorar como lista
-            </button>
-          </aside>
-        </div>
-
-        {/* Zona sensible al borde inferior: abre el cajon al pasar el mouse */}
-        <div className="sh-kbar-trigger" onMouseEnter={openDrawer} onMouseLeave={scheduleCloseDrawer} />
-
-        {/* Cajon deslizable de ejemplos */}
-        <div
-          className={`sh-kbar-drawer ${drawerOpen ? 'open' : ''}`}
-          onMouseEnter={openDrawer}
-          onMouseLeave={scheduleCloseDrawer}
-        >
-          <div className="sh-kbar-drawer-inner">
-            <div className="sh-kbar">
-              {exLoading && Array.from({ length: 9 }).map((_, i) => (
-                <div key={`ph${i}`} className="sh-kbox" style={{ opacity: .5 }}><span className="label">cargando...</span></div>
-              ))}
-              {!exLoading && exError && (
-                <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">No se pudieron cargar ejemplos.</span></div>
-              )}
-              {!exLoading && !exError && examples.length === 0 && (
-                <div className="sh-kbox" style={{ minWidth: '100%' }}><span className="label">Sin ejemplos</span></div>
-              )}
-              {!exLoading && !exError && examples.map((ex, i) => (
-                <a key={ex.key || i} className="sh-kbox"
-                  style={{ '--kbox-glow': glowFor(ex.kingdom, dark) }}
-                  href={`/species/${ex.key}`}
-                  onClick={(e) => { e.preventDefault(); navigate(`/species/${ex.key}`) }}
-                  title={ex.name}>
-                  {ex.image && <img src={ex.image} alt={ex.name} loading="lazy" />}
-                  <span className="label">{ex.name}</span>
-                </a>
-              ))}
-            </div>
-            <div className="sh-kbar-actions">
-              <button className="sh-kbtn" onClick={() => focusNode ? api.randomDescendants(focusNode.key, 9).then(setExamples) : loadKingdomExamples()}>Re-tirar ejemplos</button>
-            </div>
+          <div className="home-graph">
+            {graphData && <ShuiGraph data={graphData} onFocus={focusOn} onOpenSpecies={(k) => navigate(`/species/${k}`)} />}
+            {(initialLoading || focusLoading) && (
+              <div className="graph-loading">
+                <LoadingSpinner inline={false} timeText={formatElapsed((focusLoading ? focusTimer : initialTimer).elapsedMs)} />
+              </div>
+            )}
           </div>
-        </div>
+          <p className="graph-hint">
+            <span className="hint-mouse">Haz clic en un nombre para centrar el grafo en él; Ctrl y la rueda acercan.</span>
+            <span className="hint-touch">Toca un nombre para centrar el grafo en él.</span>
+          </p>
+
+          {level1.length > 0 && (
+            <nav className="home-children" aria-label={`Cuelgan de ${centerName}`}>
+              <span className="tool-label">Cuelgan de {centerName}:</span>
+              <ul>
+                {level1.slice(0, LIST_MAX).map((n) => (
+                  <li key={n.id} data-rank={n.rank}>
+                    <button type="button" className="ctl taxon-name"
+                      onClick={() => (n.rank === 'species' ? navigate(`/species/${n.key}`) : focusOn(n))}>{n.name}</button>
+                  </li>
+                ))}
+              </ul>
+              {level1.length > LIST_MAX && focusNode && (
+                <Link to={hrefOf(focusNode)}>y {level1.length - LIST_MAX} más en la lámina</Link>
+              )}
+            </nav>
+          )}
+          <p className="home-links">
+            {focusNode && <Link to={hrefOf(focusNode)}>Abrir la lámina de {focusNode.name}</Link>}
+            <Link to="/map">Explorar por país en el mapa</Link>
+          </p>
+        </section>
       </div>
+
+      <section className="home-examples" aria-labelledby="azar">
+        <div className="examples-head">
+          <h2 id="azar" className="folio-h2">Especies al azar{focusNode ? ` de ${focusNode.name}` : ''}</h2>
+          <button type="button" className="ctl" onClick={reloadExamples} disabled={exLoading}>Otras</button>
+        </div>
+        {exError && <p className="home-note">No se pudieron cargar ejemplos.</p>}
+        {!exError && !exLoading && examples.length === 0 && <p className="home-note">Sin especies con descripción aquí.</p>}
+        <ul className="examples" aria-busy={exLoading}>
+          {(exLoading ? Array.from({ length: 8 }, () => null) : examples).map((ex, i) => (
+            <li key={ex?.key ?? `ph${i}`} className={ex ? '' : 'placeholder'}>
+              {ex && (
+                <Link to={`/species/${ex.key}`} data-kingdom={ex.kingdom}>
+                  <Plate src={ex.image} />
+                  <span className="taxon-name binomial">{ex.name}</span>
+                  {ex.common_names?.[0] && <span className="example-common">{ex.common_names[0]}</span>}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   )
 }

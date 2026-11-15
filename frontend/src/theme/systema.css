@@ -88,6 +88,9 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
 .binomial, [data-rank="genus"] .taxon-name, [data-rank="species"] .taxon-name { font-style: italic; }
 .taxon-id { font-family: var(--code); font-size: .85em; font-variant-numeric: tabular-nums lining-nums; }
 
+/* Solo para lectores de pantalla. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 ::selection { background: var(--accent); color: var(--paper); }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
@@ -138,10 +141,10 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
 
 /* ============================================================
    PUENTE TEMPORAL (S4 → S5)
-   Las variables de elixir, bookworm y shui apuntan a las nuevas para que
+   Las variables de elixir y bookworm apuntan a las nuevas para que
    toda la app tome el papel y la tinta de Systema mientras se reescribe
-   cada componente. Borrar este bloque, tokens.css, bookworm.css y
-   shui.css cuando el último componente migre.
+   cada componente. Borrar este bloque, tokens.css y bookworm.css
+   cuando el último componente migre.
 ============================================================ */
 html body, html body.dark {
   --bg: var(--paper); --bg2: var(--paper2); --bg3: var(--paper2);
@@ -156,13 +159,5 @@ html body .bookworm-scope, html body.dark .bookworm-scope {
   --bw-accent: var(--accent); --bw-accent2: var(--ink2); --bw-danger: var(--danger);
   --bw-moss: var(--k-ink); --bw-bark: var(--ink2); --bw-ochre: var(--k-ink); --bw-amber: var(--k-ink);
   --bw-serif: var(--display); --bw-mono: var(--serif); --bw-radius: 2px;
-  background: none;
-}
-html body .shui-scope, html body.dark .shui-scope {
-  --sh-bg: var(--paper); --sh-bg2: var(--paper2); --sh-bg3: var(--paper2);
-  --sh-text: var(--ink); --sh-text2: var(--ink2); --sh-border: var(--border);
-  --sh-accent: var(--accent); --sh-accent2: var(--k-ink);
-  --sh-mono: var(--serif); --sh-radius: 2px; --mono: var(--serif);
-  font-family: var(--serif);
   background: none;
 }
