@@ -16,7 +16,7 @@ from fastapi.responses import Response
 
 from . import db, queries
 
-API_VERSION = "2.3.0"
+API_VERSION = "2.4.0"
 PROD = os.getenv("LINNEO_ENV") == "prod"
 # En prod el front y la API comparten origen; CORS solo hace falta en desarrollo.
 CORS_ORIGINS = [o for o in os.getenv("CORS_ORIGINS", "http://localhost:5135").split(",") if o]
@@ -218,6 +218,7 @@ def map_country(
     code: str,
     offset: int = Query(0, ge=0),
     limit: int = Query(500, ge=1, le=1000),
+    kingdom: str | None = Query(None, max_length=40),
 ):
-    """Especies presentes en un país, con el mismo formato que /taxon."""
-    return _found(queries.country_node(code, offset, limit), "País")
+    """Especies presentes en un país, con el mismo formato que /taxon; kingdom filtra."""
+    return _found(queries.country_node(code, offset, limit, kingdom), "País")

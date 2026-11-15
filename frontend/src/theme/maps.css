@@ -1,0 +1,14 @@
+/* ============================================================
+   Navegación geográfica (MapExplorer): la lámina del mundo a lo
+   ancho y, debajo, los mismos destinos como índice.
+============================================================ */
+@import './taxon.css';
+
+.map-head { margin-bottom: 20px; }
+.map-head .taxon-summary { min-height: 1.6em; }
+.map-plate { border: 1px solid var(--rule); margin-bottom: 24px; }
+.map-list { margin-bottom: 40px; }
+.map-continents { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 28px; margin: 0; padding: 0; font-size: var(--fs-h3); }
+.map-countries { list-style: none; margin: 0; padding: 0; columns: 13rem; column-gap: 32px; font-size: var(--fs-small); line-height: 1.9; }
+.map-continents a, .map-countries a { color: var(--ink); text-decoration-color: transparent; }
+.map-continents a:hover, .map-countries a:hover, .map-continents a:focus-visible, .map-countries a:focus-visible { color: var(--accent); text-decoration-color: currentColor; }

@@ -564,8 +564,11 @@ def graph_focus(key, children=60, grandchildren=15):
 
 # ── Geografía y totales ──
 
-def country_node(code, offset=0, limit=500):
-    """Especies presentes en un país (paginadas), con su desglose por reino."""
+def country_node(code, offset=0, limit=500, kingdom=None):
+    """Especies presentes en un país (paginadas), con su desglose por reino.
+
+    kingdom filtra en la consulta: filtrar en el front solo vería la primera página.
+    """
     code = code.strip().upper()
     rows = _run("""
         MATCH (co:Country {key: $code})
@@ -579,16 +582,21 @@ def country_node(code, offset=0, limit=500):
         return None
     species = _run(f"""
         MATCH (s:Species)-[:FOUND_IN]->(:Country {{key: $code}})
+        WHERE $kingdom IS NULL OR s.kingdom = $kingdom
         WITH s ORDER BY s.name SKIP $offset LIMIT $limit
         RETURN s {{.name, key: s.taxonID, .rank, .kingdom,
                   conservation: s.conservation_overall_code, common_names: s.commonNames,
+                  langs: s.commonNamesLanguages,
                   image: {_f(FIRST_IMAGE, 's')}, flags: {_f(SPECIES_FLAGS, 's')}}} AS sp
-    """, code=code, offset=offset, limit=limit)
+    """, code=code, offset=offset, limit=limit, kingdom=kingdom)
+    for r in species:
+        r["sp"]["common_names"] = _by_language(r["sp"]["common_names"], r["sp"].pop("langs"))
     row = rows[0]
     return {"key": code, "name": row["name"], "rank": "country", "continent": row["continent"],
             "species_count": sum(k["n"] for k in row["by_kingdom"]),
             "by_kingdom": row["by_kingdom"], "children": [r["sp"] for r in species],
-            "child_rank": "species", "offset": offset}
+            "child_rank": "species", "offset": offset, "kingdom": kingdom,
+            "children_total": sum(k["n"] for k in row["by_kingdom"] if kingdom in (None, k["kingdom"]))}
 
 
 def stats():

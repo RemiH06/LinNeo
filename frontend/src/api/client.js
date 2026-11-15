@@ -35,7 +35,11 @@ export const api = {
     return get(`/random/pool?${qs.toString()}`)
   },
   randomDescendants: (key, n = 9) => get(`/random/${key}?n=${n}`),
-  mapCountry: (code) => get(`/map/country/${encodeURIComponent(code)}`),
+  mapCountry: (code, { offset = 0, kingdom } = {}) => {
+    const qs = new URLSearchParams({ offset })
+    if (kingdom) qs.set('kingdom', kingdom)
+    return get(`/map/country/${encodeURIComponent(code)}?${qs}`)
+  },
 }
 // Paleta y etiquetas de los tipos de presencia (establishment_means)
 export const ESTABLISHMENT = {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, IUCN } from '../api/client'
+import { api } from '../api/client'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
-import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
+import { isoToName, ISO_CONTINENT, CONTINENT_ES } from '../geo/countries'
 import SiteHeader from '../components/SiteHeader'
 import Brace from '../components/Brace'
+import TaxonEntry from '../components/TaxonEntry'
 import MarginMap from '../components/MarginMap'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -26,11 +27,6 @@ const fmt = (n) => (n ?? 0).toLocaleString('es-MX')
 const pct = (n, total) => (total ? `${Math.round((100 * n) / total)} %` : '')
 const listEs = (items) => new Intl.ListFormat('es', { type: 'conjunction' }).format(items)
 const hrefOf = (t) => (t.rank === 'species' ? `/species/${t.key}` : `/taxon/${t.rank}/${t.key}`)
-const CONTINENT_ES = {
-  Africa: 'África', Antarctica: 'Antártida', Asia: 'Asia', Europe: 'Europa',
-  'North America': 'América del Norte', Oceania: 'Oceanía', 'South America': 'América del Sur',
-}
-const THREATENED = new Set(['VU', 'EN', 'CR', 'EW', 'EX'])
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 const CONTENT = [
   ['images', 'imagen'], ['descriptions', 'texto'], ['sounds', 'sonido'], ['common_names', 'nombre común'],
@@ -46,20 +42,6 @@ function initialOf(child) {
 function hasContent(child, kind) {
   if (kind === 'common_names' && child.rank === 'species') return child.common_names?.length > 0
   return child.flags?.[kind] > 0
-}
-
-function Entry({ child }) {
-  const sp = child.rank === 'species'
-  return (
-    <li data-rank={child.rank}>
-      <Link className="taxon-name" to={hrefOf(child)}>{child.name}</Link>
-      {sp && child.common_names?.[0] && <span className="entry-note">{child.common_names[0]}</span>}
-      {sp && THREATENED.has(child.conservation) && (
-        <abbr className="iucn" title={IUCN[child.conservation]?.label}>{child.conservation}</abbr>
-      )}
-      {!sp && <span className="entry-note">{child.flags?.species ? `${fmt(child.flags.species)} esp.` : 'sin especies'}</span>}
-    </li>
-  )
 }
 
 export default function TaxonNode({ nodeKey }) {
@@ -216,7 +198,7 @@ export default function TaxonNode({ nodeKey }) {
                   {gap && <p className="rank-gap">Sin {rankName(nextRank).toLowerCase()} en el backbone de GBIF</p>}
                 </div>
                 <Brace>
-                  <ul className="entries">{g.items.map((c) => <Entry key={c.key} child={c} />)}</ul>
+                  <ul className="entries">{g.items.map((c) => <TaxonEntry key={c.key} child={c} />)}</ul>
                 </Brace>
               </div>
             )

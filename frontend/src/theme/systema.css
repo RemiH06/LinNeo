@@ -120,14 +120,11 @@ mark { background: none; color: var(--accent); text-decoration: underline; text-
 .margin-stats dd { margin: 0; color: var(--ink); }
 .margin-stats dd span { display: inline-block; min-width: 3.2em; text-align: right; color: var(--ink2); }
 .margin-note { margin: 0 0 10px; font-size: var(--fs-small); color: var(--ink2); line-height: 1.5; }
+.margin-map { border: 1px solid var(--rule); }
+.margin-gap { margin-top: 32px; }
+/* Punto del pigmento de un reino junto a su nombre. */
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-.margin-map .leaflet-container { height: 190px; background: var(--paper2); border: 1px solid var(--rule); font-family: var(--serif); }
-.margin-map path.country { fill: var(--rule); fill-opacity: .55; stroke: var(--paper2); stroke-width: .4; }
-.margin-map path.country.on { fill: var(--k-ink); fill-opacity: .7; }
-.margin-map path.country.sel { fill-opacity: 1; stroke: var(--ink); stroke-width: 1.2; }
-.margin-map .leaflet-bar a { background: var(--paper); color: var(--ink); border-color: var(--rule); }
-.map-tip { font: 400 var(--fs-small)/1.3 var(--serif); background: var(--paper); color: var(--ink); border: 1px solid var(--border); border-radius: 2px; box-shadow: none; }
-.map-tip::before { display: none; }
 .continents { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 8px; }
 .continents .ctl[aria-pressed="true"] { color: var(--accent); text-decoration-color: currentColor; }
 

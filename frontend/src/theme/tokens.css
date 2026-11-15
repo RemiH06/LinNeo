@@ -210,7 +210,6 @@ audio { width: 100%; margin: 6px 0; }
 }
 
 /* Leaflet: que los popups/controles hereden la fuente */
-.leaflet-container { font-family: var(--mono); }
 
 /* imagenes en columna lateral derecha (apiladas) */
 .media-grid-side { display: flex; flex-direction: column; gap: 8px; }

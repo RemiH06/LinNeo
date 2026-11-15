@@ -291,6 +291,9 @@ class ApiTest(unittest.TestCase):
         c = self.get("/map/country/mx")
         self.assertEqual((c["continent"], c["species_count"]), ("North America", 1))
         self.assertEqual(c["by_kingdom"], [{"kingdom": "Animalia", "n": 1}])
+        self.assertEqual((c["children_total"], c["children"][0]["common_names"][0]), (1, "yaguar"))
+        c = self.get("/map/country/MX?kingdom=Plantae")
+        self.assertEqual((c["children"], c["children_total"]), ([], 0))
         self.get("/map/country/zz", status=404)
 
     def test_etag_short_circuits(self):

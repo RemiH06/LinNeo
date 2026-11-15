@@ -1,0 +1,17 @@
+/* ============================================================
+   Mapa como grabado (WorldMap): papel hundido dentro del contorno,
+   retícula de filete, países en tono de filete y lo presente en la
+   tinta del reino. Los trazos no engordan al acercar.
+============================================================ */
+.world-map { display: block; width: 100%; height: auto; background: var(--paper); }
+.world-map path, .world-map circle { vector-effect: non-scaling-stroke; }
+.wm-sphere { fill: var(--paper2); stroke: var(--border); stroke-width: 1; }
+.wm-grid { fill: none; stroke: var(--rule); stroke-width: .6; }
+.world-map .country path { fill: color-mix(in oklab, var(--rule), var(--paper2) 25%); stroke: var(--paper2); stroke-width: .5; }
+.world-map .country.on path, .world-map .country.on circle { fill: var(--k-ink); fill-opacity: .78; }
+.world-map .country circle { stroke: var(--paper); stroke-width: 1; }
+.world-map .country.live { cursor: pointer; }
+.world-map .country.live:hover path, .world-map .country.live:focus-visible path { fill-opacity: 1; stroke: var(--ink); stroke-width: 1.2; }
+.world-map .country.live:focus-visible { outline: none; }
+.world-map .country.sel path { fill: var(--accent); fill-opacity: 1; stroke: var(--ink); stroke-width: 1.2; }
+.world-map .country.dim path { fill-opacity: .35; }

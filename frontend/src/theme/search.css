@@ -23,7 +23,6 @@
 .search-meta { font-size: var(--fs-meta); color: var(--ink2); white-space: nowrap; }
 .search-common { grid-column: 2 / -1; font-size: var(--fs-small); color: var(--ink2); }
 .search-status { padding: 8px 14px; font-size: var(--fs-small); font-style: italic; color: var(--ink2); }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .search-all { padding-top: 4px; border-top: 1px solid var(--rule); font-style: normal; }
 .search-all .ctl { min-height: 28px; }
 
