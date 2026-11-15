@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { MapContainer, GeoJSON } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
 import { api, IUCN } from '../api/client'
 import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { isoToName, ISO_CONTINENT } from '../components/DistributionMap'
 import SiteHeader from '../components/SiteHeader'
 import Brace from '../components/Brace'
+import MarginMap from '../components/MarginMap'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
@@ -47,40 +46,6 @@ function initialOf(child) {
 function hasContent(child, kind) {
   if (kind === 'common_names' && child.rank === 'species') return child.common_names?.length > 0
   return child.flags?.[kind] > 0
-}
-
-// ── Mapa al margen: países como vector sobre el papel, sin teselas ──
-const GEO_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
-// Este GeoJSON codifica Taiwán como CN-TW; GBIF usa TW.
-const featureISO = (p) => (p['ISO3166-1-Alpha-2'] || p.ISO_A2 || p.iso_a2 || '').toUpperCase().replace(/^CN-TW$/, 'TW')
-
-function MarginMap({ countries, onSelect, activeCountry, activeContinent }) {
-  const [geo, setGeo] = useState(null)
-  useEffect(() => {
-    let alive = true
-    fetch(GEO_URL).then((r) => r.json()).then((d) => { if (alive) setGeo(d) }).catch(() => {})
-    return () => { alive = false }
-  }, [])
-  const present = new Set(countries)
-  const style = (f) => {
-    const iso = featureISO(f.properties)
-    const selected = iso === activeCountry || (!activeCountry && activeContinent && ISO_CONTINENT[iso] === activeContinent)
-    return { className: `country${present.has(iso) ? ' on' : ''}${selected ? ' sel' : ''}`, interactive: !!onSelect && present.has(iso) }
-  }
-  const onEach = (f, layer) => {
-    const iso = featureISO(f.properties)
-    if (!present.has(iso)) return
-    layer.bindTooltip(isoToName(iso) || iso, { sticky: true, className: 'map-tip' })
-    if (onSelect) layer.on('click', () => onSelect(iso))
-  }
-  return (
-    <div className="margin-map">
-      <MapContainer center={[20, 0]} zoom={0} minZoom={0} maxZoom={5} zoomSnap={0.25}
-        attributionControl={false} scrollWheelZoom={false} worldCopyJump>
-        {geo && <GeoJSON key={`${activeCountry}|${activeContinent}`} data={geo} style={style} onEachFeature={onEach} />}
-      </MapContainer>
-    </div>
-  )
 }
 
 function Entry({ child }) {

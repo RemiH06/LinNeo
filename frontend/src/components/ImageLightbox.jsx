@@ -1,155 +1,136 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { thumb } from '../api/media'
+import '../theme/lightbox.css'
 
 /*
-  ImageLightbox — overlay de imagen con:
-  - Fondo: captura del DOM actual blurreada (html2canvas no disponible, usamos
-    un div con backdrop-filter: blur sobre el contenido existente)
-  - Imagen centrada con zoom via rueda del raton (0.5x – 5x)
-  - Cuentagotas: sampler de color bajo el cursor sobre la imagen via canvas,
-    clic copia el HEX al portapapeles
-  - Galeria: flechas prev/next si hay multiples imagenes
-  - Cerrar: clic fuera de la imagen, tecla Escape
-
-  Props:
-    items    - array de { url, type } (solo se muestran las de type === 'image')
-    index    - indice inicial
-    onClose  - callback al cerrar
-    speciesName - nombre de la especie (para alt)
+  Visor de láminas (diálogo modal).
+  - Acercar con la rueda o los botones; arrastrar para mover (mouse o dedo).
+  - Cuentagotas: clic en la imagen copia el color HEX. Solo con imágenes que
+    permiten CORS (Wikimedia); en las demás el lienzo queda "manchado" y se avisa.
+  - Escape cierra, flechas cambian de lámina; el foco queda dentro y vuelve al
+    botón que abrió el visor.
+  Props: items [{url, title, creator, source, source_url, license}], index, onClose, speciesName.
 */
+const CORS_OK = /^https:\/\/upload\.wikimedia\.org\//
+
 export default function ImageLightbox({ items = [], index = 0, onClose, speciesName = '' }) {
   const [current, setCurrent] = useState(index)
+  const [attempt, setAttempt] = useState(0)          // 0 = miniatura, 1 = original
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [pickedColor, setPickedColor] = useState(null)
-  const [copyMsg, setCopyMsg] = useState('')
-  const [eyedropperActive, setEyedropperActive] = useState(false)
+  const [dropper, setDropper] = useState(false)
+  const [picked, setPicked] = useState(null)
+  const [msg, setMsg] = useState('')
+  const dialogRef = useRef(null)
+  const closeRef = useRef(null)
   const imgRef = useRef(null)
-  const canvasRef = useRef(null)
-  const dragging = useRef(false)
-  const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 })
+  const drag = useRef(null)
+  const img = items[current]
+  const src = img && (attempt === 0 ? thumb(img.url, 1280) : img.url)
 
-  const images = items.filter((m) => m.type === 'image')
-  const img = images[current]
+  const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); setPicked(null); setDropper(false); setMsg('') }
+  const go = (d) => { setCurrent((c) => (c + d + items.length) % items.length); setAttempt(0); resetView() }
 
-  // cerrar con Escape, navegar con flechas
+  // Foco: entra al abrir, vuelve al cerrar; Tab no sale del diálogo.
   useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'ArrowRight') next()
-      if (e.key === 'ArrowLeft') prev()
+    const opener = document.activeElement
+    closeRef.current?.focus()
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prevOverflow; opener?.focus?.() }
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose() }
+      else if (e.key === 'ArrowRight' && items.length > 1) go(1)
+      else if (e.key === 'ArrowLeft' && items.length > 1) go(-1)
+      else if (e.key === 'Tab') {
+        const f = [...dialogRef.current.querySelectorAll('button, a[href]')].filter((el) => !el.disabled)
+        if (!f.length) return
+        const first = f[0], last = f[f.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+      }
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [current, images.length])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [items.length, onClose])
 
-  function next() { setCurrent((c) => (c + 1) % images.length); resetView() }
-  function prev() { setCurrent((c) => (c - 1 + images.length) % images.length); resetView() }
-  function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); setPickedColor(null); setEyedropperActive(false) }
-
-  // zoom con rueda
-  function onWheel(e) {
-    e.preventDefault()
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-    setZoom((z) => Math.max(0.5, Math.min(5, z * factor)))
+  const clampZoom = (z) => Math.max(0.5, Math.min(6, z))
+  const onWheel = (e) => setZoom((z) => clampZoom(z * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))
+  const onPointerDown = (e) => {
+    if (dropper) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }
   }
-
-  // pan con drag
-  function onMouseDown(e) {
-    if (eyedropperActive) return
-    dragging.current = true
-    dragStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }
+  const onPointerMove = (e) => {
+    if (!drag.current) return
+    setPan({ x: drag.current.px + e.clientX - drag.current.x, y: drag.current.py + e.clientY - drag.current.y })
   }
-  function onMouseMove(e) {
-    if (!dragging.current) return
-    setPan({ x: dragStart.current.px + e.clientX - dragStart.current.x, y: dragStart.current.py + e.clientY - dragStart.current.y })
-  }
-  function onMouseUp() { dragging.current = false }
+  const onPointerUp = () => { drag.current = null }
 
-  // cuentagotas: samplear el color bajo el cursor usando un canvas temporal
   function pickColor(e) {
-    if (!eyedropperActive || !imgRef.current) return
-    const imgEl = imgRef.current
-    const rect = imgEl.getBoundingClientRect()
-    const sx = (e.clientX - rect.left) / rect.width
-    const sy = (e.clientY - rect.top) / rect.height
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
-    canvas.width = imgEl.naturalWidth
-    canvas.height = imgEl.naturalHeight
-    ctx.drawImage(imgEl, 0, 0)
-    const px = Math.floor(sx * imgEl.naturalWidth)
-    const py = Math.floor(sy * imgEl.naturalHeight)
-    const [r, g, b] = ctx.getImageData(px, py, 1, 1).data
-    const hex = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
-    setPickedColor(hex)
-    navigator.clipboard?.writeText(hex).then(() => {
-      setCopyMsg(`Copiado ${hex}`)
-      setTimeout(() => setCopyMsg(''), 2000)
-    })
+    const el = imgRef.current
+    if (!dropper || !el) return
+    const r = el.getBoundingClientRect()
+    const c = document.createElement('canvas')
+    c.width = el.naturalWidth; c.height = el.naturalHeight
+    const ctx = c.getContext('2d')
+    ctx.drawImage(el, 0, 0)
+    try {
+      const [R, G, B] = ctx.getImageData(Math.floor(((e.clientX - r.left) / r.width) * c.width),
+        Math.floor(((e.clientY - r.top) / r.height) * c.height), 1, 1).data
+      const hex = '#' + [R, G, B].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()
+      setPicked(hex)
+      navigator.clipboard?.writeText(hex).then(() => setMsg(`Copiado ${hex}`), () => setMsg(hex))
+    } catch {
+      setMsg('Esta imagen no deja leer sus colores.')
+    }
   }
 
   if (!img) return null
+  const cors = CORS_OK.test(src)
 
   return (
-    <div
-      className="lb-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-    >
-      {/* Canvas oculto para el cuentagotas */}
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+    <div className="lb-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="lb-dialog" role="dialog" aria-modal="true" aria-label={`Láminas de ${speciesName}`} ref={dialogRef}>
+        <div className="lb-bar">
+          <span className="lb-count">{items.length > 1 ? `Lámina ${current + 1} de ${items.length}` : 'Lámina'}</span>
+          <div className="lb-tools" role="group" aria-label="Vista">
+            <button type="button" className="ctl" onClick={() => setZoom((z) => clampZoom(z * 1.25))}>Acercar</button>
+            <button type="button" className="ctl" onClick={() => setZoom((z) => clampZoom(z / 1.25))}>Alejar</button>
+            <button type="button" className="ctl" onClick={resetView}>Restablecer</button>
+            {cors && (
+              <button type="button" className="ctl" aria-pressed={dropper} onClick={() => { setDropper((v) => !v); setMsg('') }}>
+                Cuentagotas
+              </button>
+            )}
+            {picked && <span className="lb-swatch" aria-hidden="true" style={{ background: picked }} />}
+            <span className="lb-msg" role="status">{msg}</span>
+          </div>
+          <button type="button" className="ctl lb-close" ref={closeRef} onClick={onClose}>Cerrar</button>
+        </div>
 
-      {/* Controles superiores */}
-      <div className="lb-controls">
-        <button className="lb-btn" onClick={() => setZoom((z) => Math.min(5, z * 1.2))}>＋</button>
-        <button className="lb-btn" onClick={() => setZoom((z) => Math.max(0.5, z / 1.2))}>－</button>
-        <button className="lb-btn" onClick={resetView} title="Restablecer vista">⊙</button>
-        <button
-          className={`lb-btn ${eyedropperActive ? 'active' : ''}`}
-          onClick={() => setEyedropperActive((v) => !v)}
-          title="Cuentagotas: clic en la imagen para copiar el color"
-        >✦</button>
-        {pickedColor && (
-          <span className="lb-color-preview">
-            <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: 3, background: pickedColor, border: '1px solid rgba(255,255,255,.4)', verticalAlign: 'middle', marginRight: 5 }} />
-            {pickedColor}
-          </span>
-        )}
-        {copyMsg && <span className="lb-copy-msg">{copyMsg}</span>}
-        <button className="lb-btn lb-close" onClick={onClose} title="Cerrar (Esc)">✕</button>
+        <div className={`lb-stage${dropper ? ' dropper' : ''}`} onWheel={onWheel}
+          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
+          <img key={src} ref={imgRef} src={src} alt={`${speciesName}${img.title ? `: ${img.title}` : ''}`}
+            crossOrigin={cors ? 'anonymous' : undefined} draggable={false} hidden={attempt > 1}
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+            onClick={pickColor}
+            onError={() => setAttempt((a) => (a === 0 && thumb(img.url, 1280) !== img.url ? 1 : 2))} />
+          {attempt > 1 && <p className="lb-msg lb-broken">No se pudo cargar esta lámina.</p>}
+        </div>
+
+        <div className="lb-foot">
+          {items.length > 1 && <button type="button" className="ctl" onClick={() => go(-1)}>‹ Anterior</button>}
+          <p className="lb-credit">
+            {img.creator}{img.creator && img.source_url && ' · '}
+            {img.source_url && <a href={img.source_url} target="_blank" rel="noreferrer">Ver la fuente</a>}
+          </p>
+          {items.length > 1 && <button type="button" className="ctl" onClick={() => go(1)}>Siguiente ›</button>}
+        </div>
       </div>
-
-      {/* Imagen centrada con zoom y pan */}
-      <div
-        className="lb-stage"
-        onWheel={onWheel}
-        onMouseDown={onMouseDown}
-        style={{ cursor: eyedropperActive ? 'crosshair' : (dragging.current ? 'grabbing' : 'grab') }}
-      >
-        <img
-          ref={imgRef}
-          src={img.url}
-          alt={speciesName}
-          className="lb-image"
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            cursor: eyedropperActive ? 'crosshair' : undefined,
-          }}
-          onClick={eyedropperActive ? pickColor : undefined}
-          draggable={false}
-          crossOrigin="anonymous"
-        />
-      </div>
-
-      {/* Navegacion galeria */}
-      {images.length > 1 && (
-        <>
-          <button className="lb-nav lb-prev" onClick={prev}>‹</button>
-          <button className="lb-nav lb-next" onClick={next}>›</button>
-          <div className="lb-counter">{current + 1} / {images.length}</div>
-        </>
-      )}
     </div>
   )
 }

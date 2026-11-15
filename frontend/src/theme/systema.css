@@ -109,6 +109,29 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
   margin: 0 0 14px; padding: 0; border: 0; letter-spacing: 0; text-transform: none;
 }
 
+/* ── Notas al margen (lámina de taxón y ficha de especie) ── */
+.taxon-margin { position: sticky; top: 24px; padding-left: 28px; border-left: 1px solid var(--rule); }
+.margin-stats { margin: 0 0 36px; font-size: var(--fs-small); }
+.margin-stats > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+.margin-stats dt { color: var(--ink2); }
+.margin-stats dd { margin: 0; color: var(--ink); }
+.margin-stats dd span { display: inline-block; min-width: 3.2em; text-align: right; color: var(--ink2); }
+.margin-note { margin: 0 0 10px; font-size: var(--fs-small); color: var(--ink2); line-height: 1.5; }
+
+.margin-map .leaflet-container { height: 190px; background: var(--paper2); border: 1px solid var(--rule); font-family: var(--serif); }
+.margin-map path.country { fill: var(--rule); fill-opacity: .55; stroke: var(--paper2); stroke-width: .4; }
+.margin-map path.country.on { fill: var(--k-ink); fill-opacity: .7; }
+.margin-map path.country.sel { fill-opacity: 1; stroke: var(--ink); stroke-width: 1.2; }
+.margin-map .leaflet-bar a { background: var(--paper); color: var(--ink); border-color: var(--rule); }
+.map-tip { font: 400 var(--fs-small)/1.3 var(--serif); background: var(--paper); color: var(--ink); border: 1px solid var(--border); border-radius: 2px; box-shadow: none; }
+.map-tip::before { display: none; }
+.continents { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 8px; }
+.continents .ctl[aria-pressed="true"] { color: var(--accent); text-decoration-color: currentColor; }
+
+@media (max-width: 900px) {
+  .taxon-margin { position: static; padding: 28px 0 0; border-left: 0; border-top: 1px solid var(--rule); }
+}
+
 /* ── Controles de texto: sin caja, como una nota al margen ── */
 .ctl {
   font: 400 var(--fs-small)/1.2 var(--serif); color: var(--ink2);

@@ -49,11 +49,11 @@ export const ESTABLISHMENT = {
 }
 // Estados IUCN: codigo -> {label, color}
 export const IUCN = {
-  LC: { label: 'Preocupacion menor', color: '#00F090' },
+  LC: { label: 'Preocupación menor', color: '#00F090' },
   NT: { label: 'Casi amenazada', color: '#9ACD32' },
   VU: { label: 'Vulnerable', color: '#F0C000' },
   EN: { label: 'En peligro', color: '#F08000' },
-  CR: { label: 'En peligro critico', color: '#F04050' },
+  CR: { label: 'En peligro crítico', color: '#F04050' },
   RE: { label: 'Extinta regionalmente', color: '#A04060' },
   EW: { label: 'Extinta en estado silvestre', color: '#8060FF' },
   EX: { label: 'Extinta', color: '#606060' },

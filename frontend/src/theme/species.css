@@ -1,0 +1,68 @@
+/* ============================================================
+   Ficha de especie: página del folio con su lámina, los textos
+   por tipo y las notas al margen. La cabeza (.taxon-head, .lineage)
+   y el margen (.taxon-margin, .margin-*) vienen de taxon.css y
+   systema.css.
+============================================================ */
+@import './taxon.css';
+
+.sp-title { margin: 0 0 14px; line-height: 1.1; overflow-wrap: anywhere; }
+.sp-title .taxon-name { font: italic 400 var(--fs-h1)/1.05 var(--serif); color: var(--accent); }
+.sp-author { font: 400 var(--fs-h3)/1.2 var(--serif); color: var(--ink2); white-space: nowrap; }
+.sp-names { margin: 0 0 6px; font-size: var(--fs-h3); line-height: 1.4; }
+.sp-names-other { font-size: var(--fs-small); color: var(--ink2); }
+.sp-names-other summary { cursor: pointer; min-height: 28px; display: inline-flex; align-items: center; }
+.sp-names-other summary:hover { color: var(--accent); }
+.sp-names-other ul { list-style: none; margin: 6px 0 0; padding: 0; columns: 14rem; column-gap: 28px; }
+.sp-names-other li { color: var(--ink); padding: 2px 0; break-inside: avoid; }
+.sp-names-other li span { color: var(--ink2); font-style: italic; margin-left: .3em; }
+
+.species-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 56px; align-items: start; }
+.sp-main { max-width: 68ch; }
+
+/* ── La lámina ── */
+.sp-figure { margin: 0 0 12px; }
+.sp-figure-open { display: block; width: 100%; padding: 0; border: 1px solid var(--rule); background: var(--paper2); cursor: zoom-in; }
+.sp-figure-open img { display: block; width: 100%; max-height: 520px; object-fit: contain; }
+.sp-figure figcaption { margin-top: 6px; font-size: var(--fs-small); font-style: italic; color: var(--ink2); }
+.sp-figure figcaption .ctl { font-style: normal; padding: 0 2px; min-height: 24px; }
+.sp-thumbs { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 36px; padding: 0; }
+.sp-thumbs button { display: block; width: 72px; height: 72px; padding: 0; border: 1px solid var(--rule); background: var(--paper2); cursor: zoom-in; overflow: hidden; }
+.sp-thumbs img { width: 100%; height: 100%; object-fit: cover; }
+.sp-thumbs button:hover { border-color: var(--k-ink); }
+
+/* ── Textos por tipo ── */
+.sp-section { margin: 0 0 36px; }
+.sp-text { margin-bottom: 18px; }
+.sp-text p { margin: 0; line-height: 1.7; }
+.sp-text .sp-source { margin-top: 4px; font-size: var(--fs-small); font-style: italic; color: var(--ink2); }
+.sp-source cite { font-style: italic; }
+.sp-refs { margin: 0 0 8px; padding-left: 1.4em; font-size: var(--fs-small); line-height: 1.5; color: var(--ink); }
+.sp-refs li { margin-bottom: 6px; overflow-wrap: anywhere; }
+
+/* ── Al margen ── */
+.iucn-tag { text-decoration: none; }
+.iucn-tag.threat { color: var(--danger); }
+.sp-sounds { list-style: none; margin: 0 0 12px; padding: 0; }
+.sp-sounds li { margin-bottom: 12px; }
+.sp-sounds audio { width: 100%; height: 36px; }
+.sp-sounds .margin-note { margin: 2px 0 0; }
+.sp-countries { list-style: none; margin: 10px 0 36px; padding: 0; font-size: var(--fs-small); line-height: 1.6; }
+.sp-countries span { color: var(--ink2); }
+.sp-synonyms { list-style: none; margin: 0 0 36px; padding: 0; font-size: var(--fs-small); line-height: 1.6; color: var(--ink2); }
+.sp-kin { margin-bottom: 24px; }
+.sp-kin .margin-note { margin-bottom: 4px; }
+.sp-kin ul { list-style: none; margin: 0 0 4px; padding: 0; font-size: var(--fs-small); line-height: 1.8; }
+.sp-kin a { color: var(--ink); text-decoration-color: transparent; }
+.sp-kin a:hover { color: var(--accent); text-decoration-color: currentColor; }
+.sp-kin > a { font-size: var(--fs-small); color: var(--accent); }
+
+@media (max-width: 900px) {
+  .species-body { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+}
+@media (max-width: 640px) {
+  .sp-author { white-space: normal; }
+  .sp-names { font-size: var(--fs-body); }
+}
+.sp-syn-more { margin: -28px 0 36px; }
+.sp-syn-more .sp-synonyms { columns: auto; margin-bottom: 0; }

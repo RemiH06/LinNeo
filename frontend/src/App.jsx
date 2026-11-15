@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { ThemeProvider } from './theme/ThemeContext'
 import { KingdomProvider } from './theme/KingdomContext'
-import SiteHeader from './components/SiteHeader'
 import SpeciesDetail from './pages/SpeciesDetail'
 import TaxonNode from './pages/TaxonNode'
 import Shui from './pages/Shui'
@@ -15,16 +14,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 
 function SpeciesPage() {
   const { key } = useParams()
-  // onOpenMedia: por ahora navega/loguea. Aqui conectaremos la transicion a bookworm.
-  const onOpenMedia = (payload) => {
-    console.log('Abrir media (futuro: transicion a bookworm)', payload)
-  }
-  return (
-    <div>
-      <SiteHeader />
-      <SpeciesDetail speciesKey={key} onOpenMedia={onOpenMedia} />
-    </div>
-  )
+  return <SpeciesDetail speciesKey={key} />
 }
 
 export default function App() {
@@ -34,7 +24,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<ErrorBoundary><Shui /></ErrorBoundary>} />
-            <Route path="/species/:key" element={<div className="page wide"><ErrorBoundary><SpeciesPage /></ErrorBoundary></div>} />
+            <Route path="/species/:key" element={<ErrorBoundary><SpeciesPage /></ErrorBoundary>} />
             <Route path="/taxon/:rank/:key/gallery" element={<ErrorBoundary><TaxonGallery /></ErrorBoundary>} />
             <Route path="/taxon/:rank/:key/sounds" element={<ErrorBoundary><SoundTree /></ErrorBoundary>} />
             <Route path="/taxon/:rank/:key/infographic" element={<ErrorBoundary><TaxonInfographic /></ErrorBoundary>} />
