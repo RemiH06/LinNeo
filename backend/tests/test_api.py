@@ -224,6 +224,7 @@ class ApiTest(unittest.TestCase):
         s = self.get("/taxon/1/sounds")
         leaf = next(n for n in s["nodes"] if n["key"] == ONCA)
         self.assertEqual(leaf["sounds"], [f"https://snd/{ONCA}/0.mp3"])
+        self.assertEqual(leaf["common_names"][0], "yaguar")  # español primero
         self.assertEqual(s["root_id"], "kingdom:1")
         self.assertEqual(len(s["edges"]), 6)  # Animalia ... Panthera onca
         self.assertEqual([c["key"] for c in s["children_pool"]["genus:2435194"]], [ONCA])
@@ -244,6 +245,8 @@ class ApiTest(unittest.TestCase):
             keys = [s["key"] for s in self.get("/random/1?n=5")]
             self.assertTrue(set(keys) <= {ONCA, LEO}, keys)  # minor solo tiene referencia
             self.assertEqual(len(keys), len(set(keys)))
+        onca = next(s for s in self.get("/random/1?n=5") if s["key"] == ONCA)
+        self.assertEqual(onca["common_names"][0], "yaguar")  # tarjetas: español primero
 
     def test_random_pool(self):
         self.assertEqual([s["key"] for s in self.get("/random/pool?kingdoms=Plantae&n=3")],

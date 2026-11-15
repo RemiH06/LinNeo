@@ -1,160 +1,154 @@
-import { useEffect, useState, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
+import { thumb } from '../api/media'
 import { useTheme } from '../theme/ThemeContext'
-import { kingdomStyleVars, kingdomAccent } from '../theme/kingdomColor'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { useElapsedTimer, formatElapsed } from '../hooks/useElapsedTimer'
 import LoadingSpinner from '../components/LoadingSpinner'
 import SiteHeader from '../components/SiteHeader'
 import { packTetris } from '../theme/tetrisPacker'
-import '../theme/bookworm.css'
+import '../theme/gallery.css'
 
 /*
-  TaxonGallery -- mosaico tipo tetris de las especies con imagen de un taxon.
-  Cada especie es UN bloque (no una imagen suelta): 1 imagen -> intenta 3x3,
-  2x2 o 1x1 segun espacio; 2-5 imagenes -> formas tetris/L de ese tamano.
-  El packing real (bin-packing simple) vive en theme/tetrisPacker.js.
+  Galería: mosaico de láminas de las especies con imagen bajo un taxón (a
+  cualquier profundidad). Cada especie es una pieza: con 1 imagen, un cuadro de
+  1, 2 o 3 celdas de lado; con 2 a 5, una forma de tantas celdas como imágenes
+  (dominó, L, tetrominó), una imagen por celda. El empaque vive en
+  theme/tetrisPacker.js. Cada página cargada se empaca aparte, así "cargar más"
+  agrega abajo sin mover lo anterior.
 */
-
-const CELL_PX = 90 // tamano base de celda en px
-const GAP_PX = 6
-const TARGET_WIDTH_RATIO = 0.7 // ~70% del ancho de viewport
-const MIN_COLS = 5 // piso para que en pantallas chicas no colapse a muy pocas columnas
-
-// Cuantas columnas de CELL_PX (+ gap) caben en el 70% del ancho de viewport
-// actual. Se recalcula en cada resize para que la galeria respire igual sin
-// importar el tamano real de pantalla del usuario.
-function useDynamicColumns() {
-  const [cols, setCols] = useState(() => computeCols())
-  useEffect(() => {
-    function onResize() { setCols(computeCols()) }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-  return cols
+const RANK_ES = {
+  biota: 'Biota', domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase', order: 'Orden',
+  family: 'Familia', genus: 'Género', species: 'Especie',
 }
-function computeCols() {
-  if (typeof window === 'undefined') return MIN_COLS
-  const targetWidth = window.innerWidth * TARGET_WIDTH_RATIO
-  const perCol = CELL_PX + GAP_PX
-  const fit = Math.floor(targetWidth / perCol)
-  return Math.max(MIN_COLS, fit)
+const PAGE = 120
+const GAP = 6
+const fmt = (n) => (n ?? 0).toLocaleString('es-MX')
+
+// Columnas según el ancho real del contenedor (antes: 70 % de la ventana y mínimo 5, que desbordaba en celular).
+function useCells(ref) {
+  const [w, setW] = useState(0)
+  useLayoutEffect(() => {
+    const ro = new ResizeObserver(([e]) => setW(Math.floor(e.contentRect.width)))
+    ro.observe(ref.current)
+    return () => ro.disconnect()
+  }, [ref])
+  const target = w < 640 ? 84 : 104
+  const cols = Math.max(3, Math.floor((w + GAP) / (target + GAP)))
+  const cell = w ? (w - GAP * (cols - 1)) / cols : target
+  return { cols, cell }
 }
 
-export default function TaxonGallery() {
-  const { rank, key } = useParams()
-  const navigate = useNavigate()
-  const { dark, toggle: toggleTheme } = useTheme()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const timer = useElapsedTimer()
-  const dynamicCols = useDynamicColumns()
-
-  useSetKingdom(data?.kingdom)
-  useKeyboardShortcuts({ navigate, toggleTheme })
-
-  useEffect(() => {
-    let alive = true
-    setLoading(true); setError(null); setData(null)
-    timer.start()
-    api.taxonGallery(key, 250)
-      .then((d) => { if (alive) { setData(d); setLoading(false); timer.stop() } })
-      .catch((e) => { if (alive) { setError(e.message); setLoading(false); timer.stop() } })
-    return () => { alive = false }
-  }, [rank, key])
-
-  // el backend ya filtra a especies con imagen (cualquier profundidad, no
-  // solo hijos directos); aqui solo se normaliza el shape para el packer.
-  const withImages = useMemo(() => {
-    if (!data?.species) return []
-    return data.species.map((c) => ({
-      ...c,
-      imageCount: c.images?.length || (c.image ? 1 : 0),
-      imageList: c.images?.length > 0 ? c.images : (c.image ? [c.image] : []),
-    }))
-  }, [data])
-
-  const { placements, gridHeight, cols } = useMemo(
-    () => packTetris(withImages, dynamicCols),
-    [withImages, dynamicCols]
-  )
-
+function Cell({ src, x, y, active, first, item, onEnter }) {
+  const [step, setStep] = useState(0)        // 0 miniatura, 1 original, 2 sin imagen
+  const url = step === 0 ? thumb(src, 250) : src
+  const style = { gridColumn: x + 1, gridRow: y + 1 }
+  const a11y = first ? { 'aria-label': item.name } : { tabIndex: -1, 'aria-hidden': true }
   return (
-    <div className="bookworm-scope" style={kingdomStyleVars(data?.kingdom, dark)}>
-      <div className="bw-page bw-page-wide">
-        <SiteHeader />
+    <Link to={`/species/${item.key}`} className={`tg-cell${active ? ' on' : ''}`} style={style}
+      data-kingdom={item.kingdom} title={item.name} onPointerEnter={onEnter} onFocus={onEnter} {...a11y}>
+      {step < 2 && src && <img src={url} alt="" loading="lazy" onError={() => setStep((s) => (s === 0 && url !== src ? 1 : 2))} />}
+    </Link>
+  )
+}
 
-        {loading && (
-          <div style={{ marginTop: 20 }}>
-            <LoadingSpinner inline={false} timeText={timer.elapsedMs != null ? formatElapsed(timer.elapsedMs) : null} />
-          </div>
-        )}
-        {error && <p style={{ marginTop: 20, color: 'var(--bw-danger)' }}>{error}</p>}
-
-        {data && (
-          <>
-            <div className="bw-header">
-              <div className="bw-header-title">
-                <div className="bw-rank">Galeria · {RANK_LABEL(data.rank)}</div>
-                <h1>{data.name}</h1>
-                <p className="bw-muted">
-                  Mostrando {data.shown} de {data.total} especie(s) con imagen.
-                </p>
-              </div>
-            </div>
-
-            {withImages.length === 0 ? (
-              <p className="bw-muted" style={{ marginTop: 20 }}>Ninguna especie de este grupo tiene imagenes.</p>
-            ) : (
-              <div
-                className="tg-grid"
-                style={{
-                  gridTemplateColumns: `repeat(${cols}, ${CELL_PX}px)`,
-                  gridTemplateRows: `repeat(${gridHeight}, ${CELL_PX}px)`,
-                  gap: GAP_PX,
-                }}
-              >
-                {placements.map(({ item, x, y, shape }, i) => {
-                  const w = Math.max(...shape.map(([dx]) => dx)) + 1
-                  const h = Math.max(...shape.map(([, dy]) => dy)) + 1
-                  const { accent } = kingdomAccent(item.kingdom, dark)
-                  return (
-                    <a
-                      key={item.key || i}
-                      className="tg-block"
-                      href={`/species/${item.key}`}
-                      onClick={(e) => { e.preventDefault(); navigate(`/species/${item.key}`) }}
-                      title={item.name}
-                      style={{
-                        gridColumn: `${x + 1} / span ${w}`,
-                        gridRow: `${y + 1} / span ${h}`,
-                        borderColor: accent,
-                      }}
-                    >
-                      <img src={item.imageList[0]} alt={item.name} loading="lazy" />
-                      <span className="tg-block-label">{item.name}</span>
-                      {item.imageList.length > 1 && (
-                        <span className="tg-block-count">+{item.imageList.length - 1}</span>
-                      )}
-                    </a>
-                  )
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+function Mosaic({ items, cols, cell, hover, setHover }) {
+  const { placements, gridHeight } = useMemo(() => packTetris(items, cols), [items, cols])
+  return (
+    <div className="tg-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${gridHeight}, ${cell}px)`, gap: GAP }}
+      onPointerLeave={() => setHover(null)}>
+      {placements.flatMap(({ item, x, y, shape }) => {
+        const square = shape.length > 1 && item.imageList.length === 1
+        if (square) {   // una imagen en un cuadro de 2×2 o 3×3: una sola celda que abarca el cuadro
+          const n = Math.sqrt(shape.length)
+          return [
+            <Link key={item.key} to={`/species/${item.key}`} className={`tg-cell${hover?.key === item.key ? ' on' : ''}`}
+              style={{ gridColumn: `${x + 1} / span ${n}`, gridRow: `${y + 1} / span ${n}` }} data-kingdom={item.kingdom}
+              title={item.name} aria-label={item.name} onPointerEnter={() => setHover(item)} onFocus={() => setHover(item)}>
+              <BigImage src={item.imageList[0]} />
+            </Link>,
+          ]
+        }
+        return shape.map(([dx, dy], i) => (
+          <Cell key={`${item.key}-${i}`} src={item.imageList[i] || item.imageList[0]} x={x + dx} y={y + dy}
+            first={i === 0} item={item} active={hover?.key === item.key} onEnter={() => setHover(item)} />
+        ))
+      })}
     </div>
   )
 }
 
-function RANK_LABEL(rank) {
-  const map = {
-    domain: 'Dominio', kingdom: 'Reino', phylum: 'Filo', class: 'Clase', order: 'Orden',
-    family: 'Familia', genus: 'Genero', species: 'Especie',
+function BigImage({ src }) {
+  const [step, setStep] = useState(0)
+  const url = step === 0 ? thumb(src, 330) : src
+  return step < 2 ? <img src={url} alt="" loading="lazy" onError={() => setStep((s) => (s === 0 && url !== src ? 1 : 2))} /> : null
+}
+
+export default function TaxonGallery() {
+  const { key } = useParams()
+  const navigate = useNavigate()
+  const { toggle: toggleTheme } = useTheme()
+  const [data, setData] = useState(null)
+  const [pages, setPages] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [more, setMore] = useState(false)
+  const [error, setError] = useState(null)
+  const [hover, setHover] = useState(null)
+  const timer = useElapsedTimer()
+  const wrapRef = useRef(null)
+  const { cols, cell } = useCells(wrapRef)
+  useSetKingdom(data?.kingdom)
+  useKeyboardShortcuts({ navigate, toggleTheme })
+
+  const norm = (list) => list.map((c) => ({ ...c, imageList: c.images?.length ? c.images.slice(0, 5) : (c.image ? [c.image] : []) }))
+    .map((c) => ({ ...c, imageCount: c.imageList.length }))
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true); setError(null); setData(null); setPages([]); setHover(null)
+    timer.start()
+    api.taxonGallery(key, PAGE)
+      .then((d) => { if (alive) { setData(d); setPages([norm(d.species)]) } })
+      .catch((e) => { if (alive) setError(e.message) })
+      .finally(() => { if (alive) { setLoading(false); timer.stop() } })
+    return () => { alive = false }
+  }, [key])
+
+  const shown = pages.reduce((s, p) => s + p.length, 0)
+  const loadMore = () => {
+    setMore(true)
+    api.taxonGallery(key, PAGE, shown)
+      .then((d) => setPages((p) => [...p, norm(d.species)]))
+      .catch((e) => setError(e.message))
+      .finally(() => setMore(false))
   }
-  return map[rank] || rank
+
+  return (
+    <div className="folio">
+      <SiteHeader />
+      {data && (
+        <header className="taxon-head" data-rank={data.rank}>
+          <p className="taxon-rank">Galería · {RANK_ES[data.rank] || data.rank}</p>
+          <h1 className="taxon-name"><Link to={`/taxon/${data.rank}/${data.key}`}>{data.name}</Link></h1>
+          <p className="taxon-summary">{fmt(data.total)} {data.total === 1 ? 'especie tiene' : 'especies tienen'} imagen. Cada pieza es una especie; sus celdas, sus láminas.</p>
+        </header>
+      )}
+      <p className="tg-caption" aria-live="polite">
+        {hover ? <><span className="binomial">{hover.name}</span>{hover.common_names?.[0] ? ` · ${hover.common_names[0]}` : ''}</> : ' '}
+      </p>
+      <div ref={wrapRef} className="tg-wrap">
+        {loading && <LoadingSpinner inline={false} timeText={formatElapsed(timer.elapsedMs)} />}
+        {error && <p className="taxon-error" role="alert">No se pudo cargar la galería: {error}</p>}
+        {data && shown === 0 && <p className="taxon-count">Ninguna especie de este grupo tiene imagen.</p>}
+        {pages.map((p, i) => <Mosaic key={i} items={p} cols={cols} cell={cell} hover={hover} setHover={setHover} />)}
+      </div>
+      {data && shown < data.total && (
+        <button type="button" className="ctl load-more tg-more" onClick={loadMore} disabled={more}>
+          {more ? 'Cargando…' : `Cargar ${fmt(Math.min(PAGE, data.total - shown))} más · van ${fmt(shown)} de ${fmt(data.total)}`}
+        </button>
+      )}
+    </div>
+  )
 }

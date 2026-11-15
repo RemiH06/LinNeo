@@ -46,10 +46,10 @@ with sync_playwright() as p:
         pg.on("pageerror", lambda x, e=errores: e.append("pageerror: " + str(x)[:200]))
         pg.on("response", lambda r, e=errores: r.status >= 400 and e.append(f"{r.status} {r.url[:120]}"))
         try:
-            pg.goto(BASE + ruta, wait_until="networkidle", timeout=30000)
+            pg.goto(BASE + ruta, wait_until="load", timeout=30000)  # networkidle no llega en la galería: sigue bajando imágenes
         except Exception as ex:
             errores.append("goto: " + str(ex)[:150])
-        pg.wait_for_timeout(1500)
+        pg.wait_for_timeout(2500)
         pg.screenshot(path=str(OUT / f"{nombre}-{MODO}.png"))
         texto = pg.inner_text("body")[:160].replace("\n", " | ")
         print(f"## {nombre} {ruta}\n   texto: {texto}")

@@ -15,7 +15,7 @@ export const api = {
   searchCladesByRank: (rank, q, limitPerGroup = 100, mode = 'contains') => get(`/search/clades/${rank}?q=${encodeURIComponent(q)}&limit_per_group=${limitPerGroup}&mode=${mode}`),
   species: (key) => get(`/species/${key}`),
   taxon: (key, offset = 0) => get(`/taxon/${key}${offset ? `?offset=${offset}` : ''}`),
-  taxonGallery: (key, limit = 250) => get(`/taxon/${key}/gallery?limit=${limit}`),
+  taxonGallery: (key, limit = 250, offset = 0) => get(`/taxon/${key}/gallery?limit=${limit}&offset=${offset}`),
   taxonSounds: (key, limit = 250) => get(`/taxon/${key}/sounds?limit=${limit}`),
   taxonInfographic: (key) => get(`/taxon/${key}/infographic`),
   filter: (params) => {

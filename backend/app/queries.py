@@ -363,6 +363,7 @@ def taxon_sound_tree(key, limit=250):
         WITH s, nodes(p) AS chain ORDER BY s.name LIMIT $limit
         RETURN [x IN chain | {{rank: x.rank, name: x.name, key: x.taxonID}}] AS chain,
                s.taxonID AS leaf, s.kingdom AS kingdom, s.commonNames AS common_names,
+               s.commonNamesLanguages AS langs,
                {_sound_card('s')}
     """, key=key, limit=limit)
 
@@ -376,7 +377,7 @@ def taxon_sound_tree(key, limit=250):
                 seen_edges.add((prev, nid))
                 edges.append({"source": prev, "target": nid})
             prev = nid
-        nodes[prev].update(kingdom=row["kingdom"], common_names=row["common_names"],
+        nodes[prev].update(kingdom=row["kingdom"], common_names=_by_language(row["common_names"], row["langs"]),
                            image=row["image"], sounds=row["sounds"])
 
     internal = [n["key"] for n in nodes.values() if n["rank"] != "species"]
@@ -490,14 +491,17 @@ def species_cards(keys):
     """Tarjeta corta de cada especie, en el orden dado."""
     if not keys:
         return []
-    return _run(f"""
+    rows = _run(f"""
         UNWIND $keys AS k
         MATCH (s:Taxon:Species {{taxonID: k}})
         RETURN s.taxonID AS key, s.name AS name, s.kingdom AS kingdom,
-               coalesce(s.commonNames, []) AS common_names,
+               coalesce(s.commonNames, []) AS common_names, s.commonNamesLanguages AS langs,
                s.conservation_overall_code AS conservation,
                {_f(FIRST_IMAGE, 's')} AS image, {_f(SPECIES_FLAGS, 's')} AS flags
     """, keys=keys)
+    for r in rows:
+        r["common_names"] = _by_language(r["common_names"], r.pop("langs"))
+    return rows
 
 
 def random_descendants(key, n=9):

@@ -69,6 +69,12 @@ body.dark[data-kingdom] {
   --rule:   color-mix(in oklab, var(--kn-paper), var(--kn-ink) 30%);
 }
 
+/* ── Reset mínimo (antes en tokens.css) ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+a { text-decoration: none; }
+a:hover { text-decoration: underline; }
+
 /* ── Base ── */
 body {
   background:
@@ -162,25 +168,13 @@ mark { background: none; color: var(--accent); text-decoration: underline; text-
   .site-head-slot { order: 3; flex-basis: 100%; }
 }
 
-/* ============================================================
-   PUENTE TEMPORAL (S4 → S5)
-   Las variables de elixir y bookworm apuntan a las nuevas para que
-   toda la app tome el papel y la tinta de Systema mientras se reescribe
-   cada componente. Borrar este bloque, tokens.css y bookworm.css
-   cuando el último componente migre.
-============================================================ */
-html body, html body.dark {
-  --bg: var(--paper); --bg2: var(--paper2); --bg3: var(--paper2);
-  --text: var(--ink); --text2: var(--ink2);
-  --teal: var(--accent); --indigo: var(--accent); --pine: var(--accent); --violet: var(--accent); --arctic: var(--accent);
-  --accent2: var(--ink2); --ok: var(--accent); --warn: var(--ink2);
-  --mono: var(--serif); --radius: 2px;
-}
-html body .bookworm-scope, html body.dark .bookworm-scope {
-  --bw-bg: var(--paper); --bw-bg2: var(--paper2); --bw-bg3: var(--paper2);
-  --bw-text: var(--ink); --bw-text2: var(--ink2); --bw-border: var(--border);
-  --bw-accent: var(--accent); --bw-accent2: var(--ink2); --bw-danger: var(--danger);
-  --bw-moss: var(--k-ink); --bw-bark: var(--ink2); --bw-ochre: var(--k-ink); --bw-amber: var(--k-ink);
-  --bw-serif: var(--display); --bw-mono: var(--serif); --bw-radius: 2px;
-  background: none;
-}
+/* ── Carga: texto, tiempo y un filete que avanza (sin porcentaje inventado) ── */
+.loading { display: flex; flex-direction: column; gap: 10px; margin: 24px 0; max-width: 28rem; color: var(--ink2); font-style: italic; }
+.loading.inline { display: inline; margin: 0; }
+.loading-time { font: normal 12px var(--code); font-variant-numeric: tabular-nums; }
+.loading-rule { position: relative; display: block; height: 1px; overflow: hidden; background: var(--rule); }
+.loading-rule::after { content: ''; position: absolute; inset: 0 auto 0 0; width: 30%; background: var(--k-ink); animation: loading-run 1.4s var(--ease-out) infinite; }
+@keyframes loading-run { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .loading-rule::after { animation: none; width: 100%; opacity: .5; } }
+
+.error-detail { margin: 12px 0 16px; padding: 12px; white-space: pre-wrap; font: 12px/1.5 var(--code); color: var(--ink2); background: var(--paper2); border-left: 2px solid var(--danger); }

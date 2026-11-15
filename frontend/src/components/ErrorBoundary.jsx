@@ -15,10 +15,11 @@ export default class ErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 20, border: '1px solid #F04050', borderRadius: 8, background: 'var(--bg2)', color: 'var(--text)', margin: 20 }}>
-          <h3 style={{ color: '#F04050', marginTop: 0 }}>Algo fallo al renderizar</h3>
-          <pre style={{ whiteSpace: 'pre-wrap', fontSize: 12, color: 'var(--text2)' }}>{String(this.state.error?.message || this.state.error)}</pre>
-          <button className="btn" onClick={() => this.setState({ error: null })}>Reintentar</button>
+        <div className="folio" role="alert">
+          <h1 className="folio-h2 taxon-error">Algo falló al mostrar esta página</h1>
+          <pre className="error-detail">{String(this.state.error?.message || this.state.error)}</pre>
+          <button type="button" className="ctl" onClick={() => this.setState({ error: null })}>Reintentar</button>
+          {' · '}<a href="/">Volver al inicio</a>
         </div>
       )
     }

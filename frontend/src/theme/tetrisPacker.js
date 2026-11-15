@@ -16,7 +16,19 @@
   Cada celda de una forma es [dx, dy] relativo a la celda ancla (arriba-izq).
 */
 
-const rnd = (arr) => arr[Math.floor(Math.random() * arr.length)]
+// Azar con semilla por especie (mulberry32): la misma especie sale siempre con la
+// misma forma, así cargar más páginas o redimensionar no revuelve el mosaico.
+function seeded(key) {
+  let a = (Number(key) || 1) >>> 0
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+let rand = Math.random
+const rnd = (arr) => arr[Math.floor(rand() * arr.length)]
 
 // Variantes de L de 3 celdas (todas las rotaciones de una L tromino)
 const L3_VARIANTS = [
@@ -111,6 +123,7 @@ export function packTetris(items, cols = 5) {
   let scanRows = Math.max(20, items.length * 2)
 
   for (const { item } of ordered) {
+    rand = seeded(item.key)
     const count = item.imageCount || 1
     let shape = null
     let pos = null
