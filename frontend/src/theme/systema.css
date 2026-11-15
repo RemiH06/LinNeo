@@ -9,6 +9,7 @@
    vira. Valores en kingdoms.generated.css, que sale de
    scripts/kingdom-palette.cjs (contraste y distancias verificados ahí).
 ============================================================ */
+@import './fonts.css';
 @import './kingdoms.generated.css';
 
 /* ── Día: folio y tinta ferrogálica ── */
@@ -92,7 +93,7 @@ a { color: var(--accent); text-underline-offset: .18em; text-decoration-thicknes
 
 /* Nomenclatura: género y especie siempre en itálica. */
 .binomial, [data-rank="genus"] .taxon-name, [data-rank="species"] .taxon-name { font-style: italic; }
-.taxon-id { font-family: var(--code); font-size: .85em; font-variant-numeric: tabular-nums lining-nums; }
+.taxon-id { font-family: var(--code); font-size: max(12px, .85em); font-variant-numeric: tabular-nums lining-nums; }
 
 /* Solo para lectores de pantalla. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

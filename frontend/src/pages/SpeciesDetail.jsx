@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, IUCN, ESTABLISHMENT } from '../api/client'
 import { thumb } from '../api/media'
+import { habitEs } from '../api/habit'
 import { isoToName } from '../geo/countries'
 import SiteHeader from '../components/SiteHeader'
 import MarginMap from '../components/MarginMap'
@@ -186,7 +187,7 @@ export default function SpeciesDetail({ speciesKey }) {
               <div><dt>Lista Roja UICN</dt>
                 <dd><abbr title={data.conservation_overall || ''} className={`iucn-tag${['VU', 'EN', 'CR', 'EW', 'EX'].includes(iucn) ? ' threat' : ''}`}>{IUCN[iucn]?.label || iucn} ({iucn})</abbr></dd></div>
             )}
-            {data.habit && <div><dt>Hábito</dt><dd>{data.habit}</dd></div>}
+            {habitEs(data.habit) && <div><dt>Hábito</dt><dd>{habitEs(data.habit)}</dd></div>}
             <div><dt>Imágenes</dt><dd>{images.length}</dd></div>
             <div><dt>Sonidos</dt><dd>{sounds.length}</dd></div>
             <div><dt>Textos</dt><dd>{data.descriptions.filter((d) => d.type !== 'reference').length}</dd></div>

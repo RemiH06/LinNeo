@@ -40,7 +40,7 @@
 .home-children li + li::before { content: '·'; margin: 0 .3em; color: var(--ink2); }
 .home-children .ctl { font-size: var(--fs-small); color: var(--ink); padding: 3px 2px; min-height: 28px; }
 .home-children .ctl:hover { color: var(--accent); }
-.home-children > a { margin-left: .6em; }
+.home-children > a { display: inline-block; min-height: 24px; margin-left: .6em; }
 .home-links { display: flex; flex-wrap: wrap; gap: 4px 24px; margin: 0; font-size: var(--fs-small); line-height: 1.9; }
 
 /* ── Especies al azar: láminas sueltas ── */
