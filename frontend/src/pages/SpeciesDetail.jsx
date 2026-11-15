@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, IUCN, ESTABLISHMENT } from '../api/client'
-import { thumb } from '../api/media'
+import { thumb, webUrl } from '../api/media'
 import { habitEs } from '../api/habit'
 import { isoToName } from '../geo/countries'
 import SiteHeader from '../components/SiteHeader'
@@ -53,7 +53,7 @@ function TextSection({ type, items }) {
           <p>{plain(d.text)}</p>
           <p className="sp-source">
             {d.lang && d.lang !== 'es' && <>En {LANG_ES[d.lang] || d.lang} · </>}
-            {d.url ? <a href={d.url} target="_blank" rel="noreferrer">{sourceName(d.source)}</a> : <cite>{sourceName(d.source)}</cite>}
+            {webUrl(d.url) ? <a href={webUrl(d.url)} target="_blank" rel="noreferrer">{sourceName(d.source)}</a> : <cite>{sourceName(d.source)}</cite>}
           </p>
         </div>
       ))}
@@ -80,7 +80,7 @@ function Figure({ image, count, name, onOpen }) {
       <figcaption>
         {count > 1 ? `Lámina 1 de ${count}` : 'Lámina'}
         {' · '}{image.creator ? `${image.creator}, ` : ''}
-        {image.source_url ? <a href={image.source_url} target="_blank" rel="noreferrer">{sourceName(image.source)}</a> : sourceName(image.source)}
+        {webUrl(image.source_url) ? <a href={webUrl(image.source_url)} target="_blank" rel="noreferrer">{sourceName(image.source)}</a> : sourceName(image.source)}
         {lic && ` · ${lic}`}
         {' · '}<button type="button" className="ctl" onClick={onOpen}>{count > 1 ? 'Ver todas' : 'Ampliar'}</button>
       </figcaption>
@@ -201,7 +201,7 @@ export default function SpeciesDetail({ speciesKey }) {
                   <li key={m.url}>
                     <audio controls preload="none" src={m.url} aria-label={`Grabación ${i + 1} de ${data.name}`} />
                     <p className="margin-note">
-                      {m.source_url ? <a href={m.source_url} target="_blank" rel="noreferrer">{sourceName(m.source)}</a> : sourceName(m.source)}
+                      {webUrl(m.source_url) ? <a href={webUrl(m.source_url)} target="_blank" rel="noreferrer">{sourceName(m.source)}</a> : sourceName(m.source)}
                       {licenseName(m.license) && ` · ${licenseName(m.license)}`}
                     </p>
                   </li>

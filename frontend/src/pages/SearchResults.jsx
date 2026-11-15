@@ -5,7 +5,7 @@ import { useTheme } from '../theme/ThemeContext'
 import { useSetKingdom } from '../theme/KingdomContext'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import SiteHeader from '../components/SiteHeader'
-import SearchBox, { hrefOf, highlight, matchNote } from '../components/SearchBox'
+import SearchBox, { CLADE_MIN, hrefOf, highlight, matchNote } from '../components/SearchBox'
 import Brace from '../components/Brace'
 import '../theme/taxon.css'
 
@@ -61,10 +61,11 @@ export default function SearchResults() {
     return () => { alive = false }
   }, [q])
 
+  const clades = q.length >= CLADE_MIN
   useEffect(() => {
-    if (!q) return
+    setByRank({}); setOnly({}); setRankState({})
+    if (!clades) return
     let alive = true
-    setByRank({}); setOnly({})
     setRankState(Object.fromEntries(RANKS.map((r) => [r, 'loading'])))
     for (const rank of RANKS) {
       api.searchCladesByRank(rank, q, 100, mode)
@@ -72,7 +73,7 @@ export default function SearchResults() {
         .catch(() => { if (alive) setRankState((p) => ({ ...p, [rank]: 'error' })) })
     }
     return () => { alive = false }
-  }, [q, mode])
+  }, [q, mode, clades])
 
   const moreHits = () => {
     setHitsState('loading')
@@ -100,7 +101,7 @@ export default function SearchResults() {
         {q && (
           <p className="taxon-summary" aria-live="polite">
             {hitsState === 'done' && `${fmt(hitsTotal)} ${hitsTotal === 1 ? 'coincidencia' : 'coincidencias'} por nombre, sinónimo o nombre común${hitsTotal >= 200 ? ' (las 200 mejores)' : ''}. `}
-            {!pending && `${fmt(cladeTotal)} nombres científicos ${verb} «${q}».`}
+            {clades && !pending && `${fmt(cladeTotal)} nombres científicos ${verb} «${q}».`}
             {pending && 'Buscando en el árbol…'}
           </p>
         )}
@@ -134,7 +135,11 @@ export default function SearchResults() {
         </section>
       )}
 
-      {q && (
+      {q && !clades && (
+        <p className="taxon-count">Con {CLADE_MIN} letras o más también se busca dentro de los nombres científicos.</p>
+      )}
+
+      {clades && (
         <section className="sr-section" aria-labelledby="nombres">
           <h2 id="nombres" className="folio-h2">Nombres científicos que {verb} «{q}»</h2>
           <div className="taxon-tools">

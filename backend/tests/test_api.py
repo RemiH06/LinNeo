@@ -7,6 +7,7 @@ Borran todo en TEST_NEO4J_URI (por defecto bolt://localhost:7688, nunca el de la
 app). Si ese Neo4j no responde, se saltan.
 """
 
+import asyncio
 import logging
 import os
 import sys
@@ -19,12 +20,15 @@ TEST_URI = os.getenv("TEST_NEO4J_URI", "bolt://localhost:7688")
 os.environ["NEO4J_URI"] = TEST_URI  # antes de importar la app: gana sobre el .env
 os.environ["NEO4J_PASSWORD"] = ""
 os.environ["NEO4J_DATABASE"] = "neo4j"
+os.environ["LINNEO_ENV"] = "dev"  # sin ella la API se comporta como producción
+os.environ["LINNEO_RATE_BURST"] = "100000"  # la suite entera no debe chocar con el límite
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # El fixture omite propiedades opcionales; Neo4j avisa de cada una.
 logging.getLogger("neo4j").setLevel(logging.ERROR)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import main  # noqa: E402
 from app.main import app  # noqa: E402
 
 SCHEMA = (Path(__file__).resolve().parents[2] / "ops" / "schema.cypher").read_text(encoding="utf-8")
@@ -183,6 +187,18 @@ class ApiTest(unittest.TestCase):
         self.assertEqual((rel["genus"]["key"], rel["family"]["key"]), (2435194, 9703))
         self.assertEqual([x["key"] for x in rel["sibling_species"]], [LEO])
 
+    def test_key_out_of_int64(self):
+        self.get("/species/99999999999999999999", status=422)  # antes, 500 del driver
+
+    def test_heavy_routes_wait_then_503(self):
+        slots, wait = main._heavy, main.HEAVY_WAIT
+        main._heavy, main.HEAVY_WAIT = asyncio.Semaphore(0), 0.1  # sin lugares libres
+        try:
+            self.assertIn("retry-after", self.get("/taxon/1/gallery", status=503).headers)
+            self.get("/stats")  # las rutas ligeras no esperan lugar
+        finally:
+            main._heavy, main.HEAVY_WAIT = slots, wait
+
     def test_species_404(self):
         self.get("/species/9703", status=404)  # una familia no es especie
         self.get("/species/999", status=404)
@@ -273,17 +289,22 @@ class ApiTest(unittest.TestCase):
 
     def test_search_escapes_lucene(self):
         self.get('/search?q=panth*"era')
+        # Palabras de una letra se descartan (veinte tronaban Lucene) y sobran las de más de 6.
+        self.assertEqual(self.get("/search?q=a b c d e f g h i j k")["results"], [])
+        self.get("/search?q=jaguar " + " ".join(["xx"] * 20))
 
     def test_search_clades(self):
         r = self.get("/search/clades/species?q=onca")
         self.assertEqual(r["groups"][0]["items"][0]["key"], ONCA)
         self.assertEqual(r["groups"][0]["items"][0]["parent"], "Panthera")
-        r = self.get("/search/clades/species?q=on&mode=starts")
+        r = self.get("/search/clades/species?q=onc&mode=starts")
         self.assertEqual([i["key"] for g in r["groups"] for i in g["items"]], [ONCA])
         r = self.get("/search/clades/species?q=pan&mode=starts")
         self.assertEqual(r["groups"], [])
         self.assertIn("genus", self.get("/search/clades?q=panth")["groups"])
         self.get("/search/clades/tribe?q=onca", status=422)
+        self.get("/search/clades?q=pa", status=422)  # con 2 letras la subcadena tarda segundos
+        self.assertEqual(self.get("/search/clades/species?q=ONCA")["groups"][0]["items"][0]["key"], ONCA)
 
     def test_filter(self):
         self.assertEqual([x["key"] for x in self.get("/filter?country=mx")["results"]], [ONCA])
@@ -298,6 +319,8 @@ class ApiTest(unittest.TestCase):
         c = self.get("/map/country/MX?kingdom=Plantae")
         self.assertEqual((c["children"], c["children_total"]), ([], 0))
         self.get("/map/country/zz", status=404)
+        self.get("/map/country/mex", status=422)
+        self.get("/map/country/mx?offset=100001", status=422)
 
     def test_etag_short_circuits(self):
         r = self.client.get("/stats")
@@ -311,6 +334,22 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(ok.headers.get("access-control-allow-origin"), "http://localhost:5135")
         bad = self.client.get("/stats", headers={"Origin": "https://evil.example"})
         self.assertIsNone(bad.headers.get("access-control-allow-origin"))
+
+    def test_rate_limit(self):
+        burst, main.RATE_BURST = main.RATE_BURST, 3
+        main._buckets.clear()
+        try:
+            for _ in range(3):
+                self.get("/")
+            r = self.get("/", status=429)
+            self.assertGreaterEqual(int(r.headers["retry-after"]), 1)
+            # Fuera de prod CF-Connecting-IP no cuenta: falsificarlo no da otra cubeta.
+            self.get("/", status=429, headers={"CF-Connecting-IP": "203.0.113.9"})
+            main.PROD = True  # detrás del túnel, cada IP real tiene su cubeta
+            self.get("/", headers={"CF-Connecting-IP": "203.0.113.9"})
+        finally:
+            main.RATE_BURST, main.PROD = burst, False
+            main._buckets.clear()
 
 
 if __name__ == "__main__":

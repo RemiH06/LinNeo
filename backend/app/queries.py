@@ -69,9 +69,14 @@ def _node_id(rank, key):
 LUCENE_SPECIAL = re.compile(r'([+\-&|!(){}\[\]^"~*?:\\/])')
 
 
+# Una letra con prefijo y difuso empata con casi todo el índice, y veinte de ellas
+# tronaban Lucene (500): solo palabras de 2+ letras y a lo más 6.
+MAX_WORDS = 6
+
+
 def lucene_query(term):
     """Cada palabra exacta, por prefijo o con una letra de diferencia; todas obligatorias."""
-    words = [LUCENE_SPECIAL.sub(r"\\\1", w) for w in term.lower().split()]
+    words = [LUCENE_SPECIAL.sub(r"\\\1", w) for w in term.lower().split() if len(w) > 1][:MAX_WORDS]
     return " AND ".join(f"({w}^3 OR {w}* OR {w}~1)" for w in words)
 
 
@@ -115,11 +120,12 @@ def search(term, offset=0, limit=25):
 
 # La data no cambia mientras la API corre (un import exige reiniciarla), así que
 # lo que sigue caro tras los agregados se guarda en memoria. Medido en Pixilate:
-# galería de Animalia 2.2 s, subcadena "ana" en especies 0.6 s.
+# galería de Animalia 2.2 s, subcadena "ana" en especies 0.6 s. Galería y sonidos
+# pesan cientos de KB por entrada: menos lugares, para no rozar los 512 MB del contenedor.
 cached = lru_cache(maxsize=256)
+cached_big = lru_cache(maxsize=48)
 
 
-@cached
 def search_clades_by_rank(term, rank, limit_per_group=100, mode="contains"):
     """Busca `term` como subcadena del nombre en un rango, agrupado por reino.
 
@@ -127,7 +133,12 @@ def search_clades_by_rank(term, rank, limit_per_group=100, mode="contains"):
     segunda palabra), porque la primera siempre es el género.
     Usa el índice TEXT de nameLower (trigramas).
     """
-    t = term.strip().lower()
+    # Normalizado antes del caché: "Ana", "ana" y " ana" son una sola entrada.
+    return _clades_by_rank(" ".join(term.lower().split()), rank, limit_per_group, mode)
+
+
+@cached
+def _clades_by_rank(t, rank, limit_per_group, mode):
     if not t or rank not in RANKS:
         return []
     if mode == "starts" and rank == "species":
@@ -318,7 +329,7 @@ def taxon_node(key, offset=0, limit=500):
     }
 
 
-@cached
+@cached_big
 def taxon_gallery(key, offset=0, limit=250):
     """Especies con imagen a cualquier profundidad, en orden alfabético.
 
@@ -346,7 +357,7 @@ def _sound_card(v):
             f"RETURN m.url }} AS sounds, {_f(FIRST_IMAGE, v)} AS image")
 
 
-@cached
+@cached_big
 def taxon_sound_tree(key, limit=250):
     """Árbol del taxón hasta sus especies con sonido (las primeras `limit`).
 

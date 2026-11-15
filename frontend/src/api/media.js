@@ -19,3 +19,7 @@ export function thumb(url, width = 330) {
   if (suffix === null) return url
   return `https://upload.wikimedia.org/wikipedia/commons/thumb/${a}/${ab}/${file}/${w}px-${file}${suffix}`
 }
+
+// Enlaces que vienen de los datos (GBIF y demás fuentes): solo http(s). Un
+// `javascript:` en un dato no correría (CSP), pero tampoco debe quedar como enlace.
+export const webUrl = (url) => (/^https?:\/\//i.test(url ?? '') ? url : null)

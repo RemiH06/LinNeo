@@ -1,0 +1,104 @@
+# Producción en el WSL de Pixilate: se monta encima de compose.yml. Usar ops/prod.sh,
+# que pasa los dos archivos (olvidar el segundo levantaría el Neo4j de desarrollo).
+#
+#   ops/prod.sh up -d --build      ops/prod.sh ps      ops/prod.sh logs -f api
+#
+# Único puerto en el host: 127.0.0.1:8036 (Caddy). El túnel de 29.Bakery/publicacion
+# (red del host) lo publica en linneo.remlam.dev. Neo4j y la API no salen de la red
+# `interna`, que no tiene salida a internet.
+#
+# El grafo llega de un volcado del de desarrollo (ops/dump.sh, ops/restore.sh): prod
+# nunca corre el import. Secretos en ops/.env (plantilla: ops/.env.example, chmod 600).
+name: linneo-prod
+
+x-comun: &comun
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  neo4j:
+    <<: *comun
+    # Sin root: el entrypoint no necesita cambiar de usuario y se pueden quitar todas las capacidades.
+    user: "7474:7474"
+    cap_drop: [ALL]
+    ports: !reset []
+    volumes: !override
+      - data:/data
+      - logs:/logs
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?falta NEO4J_PASSWORD en ops/.env}
+      # La API solo lee; aunque alguien lograra mandar Cypher, no podría escribir.
+      NEO4J_server_databases_default__to__read__only: "true"
+      # Sin Neo4j Browser ni API HTTP: la API habla bolt.
+      NEO4J_server_http_enabled: "false"
+    mem_limit: 5g
+    networks: [interna]
+    healthcheck:
+      # La imagen no trae curl ni wget; basta con que bolt acepte conexiones.
+      test: ["CMD", "bash", "-c", ":> /dev/tcp/127.0.0.1/7687"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 3m
+
+  api:
+    <<: *comun
+    build: ../backend
+    image: linneo-api:local
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop: [ALL]
+    environment:
+      LINNEO_ENV: prod
+      CORS_ORIGINS: ""  # front y API comparten origen
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+    cpus: 2
+    mem_limit: 512m
+    pids_limit: 128
+    networks: [interna]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8035/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    <<: *comun
+    build: ../frontend
+    image: linneo-web:local
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /data
+      - /config
+    cap_drop: [ALL]
+    ports:
+      - "127.0.0.1:8036:8080"
+    mem_limit: 128m
+    pids_limit: 64
+    # `default` solo para poder publicar el puerto (una red interna no lo permite).
+    networks: [interna, default]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  interna:
+    internal: true

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { thumb } from '../api/media'
+import { thumb, webUrl } from '../api/media'
 
 /*
   Atril de grabaciones: un reproductor independiente por especie (pueden sonar
@@ -60,7 +60,7 @@ function Recording({ tab, onClose }) {
         )}
       </div>
       <div className="rec-actions">
-        <a className="ctl" href={tab.soundUrl} target="_blank" rel="noreferrer" download>Descargar</a>
+        <a className="ctl" href={webUrl(tab.soundUrl) ?? undefined} target="_blank" rel="noreferrer" download>Descargar</a>
         <button type="button" className="ctl" onClick={onClose}>Cerrar</button>
       </div>
     </li>

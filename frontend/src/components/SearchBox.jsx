@@ -17,6 +17,7 @@ const RANK_ES = {
   order: 'Orden', family: 'Familia', genus: 'Género', species: 'Especie',
 }
 const MAX = 10
+export const CLADE_MIN = 3   // la API rechaza subcadenas más cortas (con 2 letras tardan segundos)
 export const hrefOf = (t) => (t.rank === 'species' ? `/species/${t.key}` : `/taxon/${t.rank}/${t.key}`)
 
 export function highlight(text, query) {
@@ -66,7 +67,9 @@ export default function SearchBox({ initial = '', inputRef, onNavigate }) {
       const id = ++seq.current
       const term = value.trim()
       setLoading(true); setFailed(false)
-      Promise.allSettled([api.search(term, 6), api.searchClades(term, 6)]).then(([full, clades]) => {
+      // La subcadena pide 3 letras (con 2 tarda segundos); antes, solo texto completo.
+      const cladesP = term.length >= CLADE_MIN ? api.searchClades(term, 6) : Promise.resolve({ groups: {} })
+      Promise.allSettled([api.search(term, 6), cladesP]).then(([full, clades]) => {
         if (id !== seq.current) return   // llegó tarde: ya se escribió otra cosa
         if (full.status === 'rejected' && clades.status === 'rejected') { setResults([]); setFailed(true) }
         else {

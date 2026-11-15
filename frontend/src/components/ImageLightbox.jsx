@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { thumb } from '../api/media'
+import { thumb, webUrl } from '../api/media'
 import '../theme/lightbox.css'
 
 /*
@@ -126,7 +126,7 @@ export default function ImageLightbox({ items = [], index = 0, onClose, speciesN
           {items.length > 1 && <button type="button" className="ctl" onClick={() => go(-1)}>‹ Anterior</button>}
           <p className="lb-credit">
             {img.creator}{img.creator && img.source_url && ' · '}
-            {img.source_url && <a href={img.source_url} target="_blank" rel="noreferrer">Ver la fuente</a>}
+            {webUrl(img.source_url) && <a href={webUrl(img.source_url)} target="_blank" rel="noreferrer">Ver la fuente</a>}
           </p>
           {items.length > 1 && <button type="button" className="ctl" onClick={() => go(1)}>Siguiente ›</button>}
         </div>
